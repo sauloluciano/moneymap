@@ -298,7 +298,7 @@
 // ─── Supabase config — SUBSTITUA pelos valores do seu projeto ───────────────
 const SUPABASE_URL = 'https://fzezjjioieqfszuvwzfm.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6ZXpqamlvaWVxZnN6dXZ3emZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NjQ2OTEsImV4cCI6MjA5NTM0MDY5MX0.MZnWwKg2XbtxuFhtlHQqq2ybfTMK0Ngj7wN0uLoN9iQ';
-const _sb = (SUPABASE_URL !== 'https://fzezjjioieqfszuvwzfm.supabase.co/rest/v1/')
+const _sb = (SUPABASE_URL !== 'https://fzezjjioieqfszuvwzfm.supabase.co')
   ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
   : null;
 
