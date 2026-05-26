@@ -298,30 +298,24 @@
 // ─── Supabase config — SUBSTITUA pelos valores do seu projeto ───────────────
 const SUPABASE_URL = 'https://fzezjjioieqfszuvwzfm.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6ZXpqamlvaWVxZnN6dXZ3emZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NjQ2OTEsImV4cCI6MjA5NTM0MDY5MX0.MZnWwKg2XbtxuFhtlHQqq2ybfTMK0Ngj7wN0uLoN9iQ';
-const _sb = (SUPABASE_URL !== 'https://fzezjjioieqfszuvwzfm.supabase.co')
-  ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
-  : null;
+const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// ─── Storage abstraction: Supabase when configured, localStorage as fallback ─
+// ─── Storage abstraction: Supabase only ──────────────────────────────────────
 const DB = {
   async get(key) {
-    if (!_sb) return localStorage.getItem(key);
     const { data } = await _sb.from('fp_config').select('value').eq('key', key).single();
     return data ? JSON.stringify(data.value) : null;
   },
   async set(key, value) {
-    if (!_sb) { localStorage.setItem(key, value); return; }
     await _sb.from('fp_config').upsert({ key, value: JSON.parse(value), updated_at: new Date().toISOString() });
   },
   async remove(key) {
-    if (!_sb) { localStorage.removeItem(key); return; }
     await _sb.from('fp_config').delete().eq('key', key);
   }
 };
 
 // ─── Transaction helpers ──────────────────────────────────────────────────────
 async function saveTxToSupabase(txs) {
-  if (!_sb) return;
   const rows = txs.map(t => ({
     id:                  t.id,
     date:                t.date,
@@ -342,7 +336,6 @@ async function saveTxToSupabase(txs) {
 }
 
 async function loadTxFromSupabase() {
-  if (!_sb) return null;
   const { data, error } = await _sb.from('fp_transactions').select('*').order('date', { ascending: false });
   if (error || !data) return null;
   return data.map(r => ({
@@ -364,12 +357,10 @@ async function loadTxFromSupabase() {
 }
 
 async function deleteTxByImportId(importId) {
-  if (!_sb) return;
   await _sb.from('fp_transactions').delete().eq('import_id', importId);
 }
 
 async function deleteAllTx() {
-  if (!_sb) return;
   await _sb.from('fp_transactions').delete().neq('id','__never__');
 }
 
@@ -578,9 +569,9 @@ const DEFAULT_GOALS = { supermercado:2000,transporte:800,saude:600,lazer:1000,vi
 // Sem dados de exemplo — sistema inicia zerado
 
 // ─── State ───────────────────────────────────────────────────────────────────
-let transactions = JSON.parse(localStorage.getItem("fp:tx"))    || [];
-let goals        = JSON.parse(localStorage.getItem("fp:goals")) || DEFAULT_GOALS;
-let invGoal      = JSON.parse(localStorage.getItem("fp:inv"))   || 3000;
+let transactions = [];
+let goals        = DEFAULT_GOALS;
+let invGoal      = 3000;
 let activeTab    = "dashboard";
 const _now = new Date();
 let filterMonth  = _now.getFullYear() + "-" + String(_now.getMonth()+1).padStart(2,"0");
@@ -594,14 +585,15 @@ let histView     = "overview";
 let histCat      = "alimentacao";
 let overviewChart = null;
 let catChart      = null;
-let projects = JSON.parse(localStorage.getItem('fp:projects') || '[]');
-let sources  = JSON.parse(localStorage.getItem('fp:sources')  || '[]');
+let projects = [];
+let sources  = [];
 
 function save() {
-  localStorage.setItem("fp:tx",       JSON.stringify(transactions));
-  localStorage.setItem("fp:goals",    JSON.stringify(goals));
-  localStorage.setItem("fp:inv",      JSON.stringify(invGoal));
-  localStorage.setItem("fp:projects", JSON.stringify(projects));
+  saveTxToSupabase(transactions).catch(e => console.error('Supabase tx save error:', e));
+  DB.set("fp:goals",    JSON.stringify(goals)).catch(e => console.error('Supabase goals save error:', e));
+  DB.set("fp:inv",      JSON.stringify(invGoal)).catch(e => console.error('Supabase inv save error:', e));
+  DB.set("fp:projects", JSON.stringify(projects)).catch(e => console.error('Supabase projects save error:', e));
+  DB.set("fp:sources",  JSON.stringify(sources)).catch(e => console.error('Supabase sources save error:', e));
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -2611,13 +2603,13 @@ function restoreConfig(input) {
       const data = JSON.parse(e.target.result);
       if (data._type !== 'moneymap_config') throw new Error('Arquivo inválido. Selecione um backup de configurações.');
 
-      if (data.sources)    { sources = data.sources; localStorage.setItem('fp:sources', JSON.stringify(sources)); }
-      if (data.goals)      { goals   = data.goals;   localStorage.setItem('fp:goals',   JSON.stringify(goals));   }
-      if (data.invGoal !== undefined) { invGoal = data.invGoal; localStorage.setItem('fp:inv', JSON.stringify(invGoal)); }
-      if (data.projects)   { projects = data.projects; localStorage.setItem('fp:projects', JSON.stringify(projects)); }
-      if (data.customCats) localStorage.setItem('fp:customCats', JSON.stringify(data.customCats));
-      if (data.catLabels)  localStorage.setItem('fp:catLabels',  JSON.stringify(data.catLabels));
-      if (data.keywords)   { localStorage.setItem('fp:keywords', JSON.stringify(data.keywords)); KEYWORD_MAP = loadKeywordMap(); }
+      if (data.sources)    { sources = data.sources; DB.set('fp:sources', JSON.stringify(sources)); }
+      if (data.goals)      { goals   = data.goals;   DB.set('fp:goals',   JSON.stringify(goals));   }
+      if (data.invGoal !== undefined) { invGoal = data.invGoal; DB.set('fp:inv', JSON.stringify(invGoal)); }
+      if (data.projects)   { projects = data.projects; DB.set('fp:projects', JSON.stringify(projects)); }
+      if (data.customCats) { localStorage.setItem('fp:customCats', JSON.stringify(data.customCats)); DB.set('fp:customCats', JSON.stringify(data.customCats)); }
+      if (data.catLabels)  { localStorage.setItem('fp:catLabels',  JSON.stringify(data.catLabels));  DB.set('fp:catLabels',  JSON.stringify(data.catLabels));  }
+      if (data.keywords)   { localStorage.setItem('fp:keywords', JSON.stringify(data.keywords)); DB.set('fp:keywords', JSON.stringify(data.keywords)); KEYWORD_MAP = loadKeywordMap(); }
 
       // Reload custom categories into CATEGORIES array
       loadCustomCategories();
@@ -2658,7 +2650,7 @@ function restoreTransactions(input) {
         showBackupMsg('✓ ' + transactions.length + ' transações restauradas (dados anteriores substituídos)', '#3B6D11', '#EAF3DE');
       }
 
-      if (data.importLog) localStorage.setItem('fp:importLog', JSON.stringify(data.importLog));
+      if (data.importLog) { localStorage.setItem('fp:importLog', JSON.stringify(data.importLog)); DB.set('fp:importLog', JSON.stringify(data.importLog)); }
       save();
       const n = new Date();
       filterMonth = n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0');
@@ -3055,33 +3047,24 @@ document.getElementById("monthSelect").addEventListener("change",function(){
   renderActiveTab();
 });
 
-// Migrate old categories on first load
-(function migrateCats() {
-  // Migrate transaction categories
-  const stored = localStorage.getItem('fp:tx');
-  if (stored) {
-    try {
-      let txs = JSON.parse(stored);
-      let changed = false;
-      txs = txs.map(t => {
-        if (t.category === 'roupas')   { t.category = 'pessoais_saulo'; changed = true; }
-        if (t.category === 'servicos') { t.category = 'outros';         changed = true; }
-        // Auto-flag Cartão Dani for all cartao_dani category transactions
-        if (t.category === 'cartao_dani' && !t.isAdditionalCard) {
-          t.isAdditionalCard = true; changed = true;
-        }
-        return t;
-      });
-      if (changed) localStorage.setItem('fp:tx', JSON.stringify(txs));
-    } catch(e) {}
-  }
+// Migrate old categories on first load (runs after init() populates transactions)
+function migrateCats() {
+  let changed = false;
+  transactions = transactions.map(t => {
+    if (t.category === 'roupas')   { t.category = 'pessoais_saulo'; changed = true; }
+    if (t.category === 'servicos') { t.category = 'outros';         changed = true; }
+    if (t.category === 'cartao_dani' && !t.isAdditionalCard) {
+      t.isAdditionalCard = true; changed = true;
+    }
+    return t;
+  });
+  if (changed) saveTxToSupabase(transactions).catch(e => console.error('migrateCats save error:', e));
   // Clear stale catLabel overrides for built-in categories
   // (prevents old saved labels from overriding renamed built-ins)
   const catLabelsStored = localStorage.getItem('fp:catLabels');
   if (catLabelsStored) {
     try {
       const labelsObj = JSON.parse(catLabelsStored);
-      // Remove overrides whose stored value matches an OLD name we've since changed
       const staleLabels = ['Aporte Empresa','Retorno de Aporte','Retorno Aporte',
         'Pessoais - Saulo','Educação','Transporte','Roupas','Serviços'];
       let labelChanged = false;
@@ -3095,7 +3078,6 @@ document.getElementById("monthSelect").addEventListener("change",function(){
   }
 
   // Remove duplicate custom categories that duplicate built-in ones
-  // (e.g. user may have created "Cachorros" via UI before it became built-in)
   const customStored = localStorage.getItem('fp:customCats');
   if (customStored) {
     try {
@@ -3104,7 +3086,6 @@ document.getElementById("monthSelect").addEventListener("change",function(){
         "transferencia","cachorros","cartao_dani","serena_rotina","inv_temp_cred","inv_temp_deb",
         "inv_aporte","inv_resgate","inv_lucro","outras_entradas","aporte_empresa","retorno_aporte","receita","outros"];
       let customs = JSON.parse(customStored);
-      // Also remove any custom cat whose label matches a built-in label (case-insensitive)
       const builtInLabels = CATEGORIES.map(c => c.label.toLowerCase());
       const cleaned = customs.filter(c =>
         !builtInIds.includes(c.id) &&
@@ -3115,21 +3096,21 @@ document.getElementById("monthSelect").addEventListener("change",function(){
       }
     } catch(e) {}
   }
-})();
-// Load data from Supabase if configured, then initialize
+}
+
+// Load data from Supabase, then initialize
 (async function init() {
-  if (_sb) {
-    document.getElementById("dashboard").innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text2)"><i class="ti ti-loader-2" style="font-size:40px;display:block;margin-bottom:12px;animation:spin 1s linear infinite"></i>Carregando dados...</div>';
-    try {
-      const remoteTx = await loadTxFromSupabase();
-      if (remoteTx && remoteTx.length > 0) transactions = remoteTx;
-      const remoteGoals    = await DB.get("fp:goals");    if (remoteGoals)    goals    = JSON.parse(remoteGoals);
-      const remoteInv      = await DB.get("fp:inv");      if (remoteInv)      invGoal  = JSON.parse(remoteInv);
-      const remoteProjects = await DB.get("fp:projects"); if (remoteProjects) projects = JSON.parse(remoteProjects);
-      const remoteSources  = await DB.get("fp:sources");  if (remoteSources)  sources  = JSON.parse(remoteSources);
-      const remoteImportLog= await DB.get("fp:importLog"); if (remoteImportLog) localStorage.setItem("fp:importLog", remoteImportLog);
-    } catch(e) { console.warn("Supabase load error:", e); }
-  }
+  document.getElementById("dashboard").innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text2)"><i class="ti ti-loader-2" style="font-size:40px;display:block;margin-bottom:12px;animation:spin 1s linear infinite"></i>Carregando dados...</div>';
+  try {
+    const remoteTx = await loadTxFromSupabase();
+    if (remoteTx && remoteTx.length > 0) transactions = remoteTx;
+    const remoteGoals    = await DB.get("fp:goals");    if (remoteGoals)    goals    = JSON.parse(remoteGoals);
+    const remoteInv      = await DB.get("fp:inv");      if (remoteInv)      invGoal  = JSON.parse(remoteInv);
+    const remoteProjects = await DB.get("fp:projects"); if (remoteProjects) projects = JSON.parse(remoteProjects);
+    const remoteSources  = await DB.get("fp:sources");  if (remoteSources)  sources  = JSON.parse(remoteSources);
+    const remoteImportLog= await DB.get("fp:importLog"); if (remoteImportLog) localStorage.setItem("fp:importLog", remoteImportLog);
+  } catch(e) { console.warn("Supabase load error:", e); }
+  migrateCats();
   loadCustomCategories();
   buildMonthSelect();
   renderDashboard();
