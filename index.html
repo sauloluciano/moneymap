@@ -1,0 +1,3142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MoneyMap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f5f3; --surface: #ffffff; --surface2: #f0efeb;
+    --border: rgba(0,0,0,0.10); --border2: rgba(0,0,0,0.18);
+    --text: #1a1a18; --text2: #6b6b67; --text3: #9b9b97;
+    --green: #1a3a2a; --green-t: #4ade80;
+    --red-bg: #3a1a1a; --red-t: #f87171;
+    --blue-bg: #1a2a3a; --blue-t: #60a5fa;
+    --accent: #27AE60; --warn: #E24B4A;
+    --radius: 12px; --radius-sm: 8px; --radius-xs: 6px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a; --surface: #252523; --surface2: #2e2e2b;
+      --border: rgba(255,255,255,0.10); --border2: rgba(255,255,255,0.18);
+      --text: #f0efe9; --text2: #9b9b97; --text3: #6b6b67;
+    }
+  }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+  button { font-family: inherit; cursor: pointer; }
+  input, select { font-family: inherit; }
+  table { border-collapse: collapse; width: 100%; }
+
+  /* Layout */
+  #app { min-height: 100vh; padding-bottom: 48px; }
+  .header { background: var(--surface); border-bottom: 0.5px solid var(--border); padding: 0 24px; position: sticky; top: 0; z-index: 100; }
+  .header-top { max-width: 940px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 56px; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 32px; height: 32px; border-radius: 8px; background: #1a3a2a; display: flex; align-items: center; justify-content: center; }
+  .logo-name { font-weight: 600; font-size: 15px; letter-spacing: -0.3px; }
+  .badge-saved { font-size: 11px; background: #EAF3DE; color: #3B6D11; border-radius: 4px; padding: 2px 7px; font-weight: 500; }
+  .nav { max-width: 940px; margin: 0 auto; display: flex; gap: 2px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .nav-btn { display: flex; align-items: center; gap: 6px; padding: 10px 14px; background: transparent; border: none; border-bottom: 2px solid transparent; color: var(--text2); font-weight: 400; font-size: 13px; cursor: pointer; transition: all .15s; white-space: nowrap; }
+  .nav-btn.active { border-bottom-color: #1a3a2a; color: var(--text); font-weight: 500; }
+  .nav-btn:hover:not(.active) { color: var(--text); }
+  .notif { background: #E8622A; color: #fff; border-radius: 10px; font-size: 10px; padding: 1px 6px; font-weight: 600; }
+  .content { max-width: 940px; margin: 0 auto; padding: 24px 16px; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* Cards */
+  .card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 18px 20px; }
+  .card + .card { margin-top: 16px; }
+  .metric-card { border-radius: var(--radius); padding: 14px 16px; }
+  .metric-label { font-size: 12px; color: rgba(255,255,255,0.65); margin-bottom: 4px; }
+  .metric-value { font-size: 22px; font-weight: 600; letter-spacing: -0.5px; }
+  .metric-sub { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .grid-5 { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 20px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+
+  /* Highlights bar */
+  .highlights { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 14px 18px; margin-bottom: 20px; display: flex; gap: 24px; flex-wrap: wrap; }
+  .highlight-chip { display: flex; align-items: center; gap: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* Progress bars */
+  .prog-bar-bg { height: 6px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+  .prog-bar-fill { height: 100%; border-radius: 4px; transition: width .4s ease; }
+  .prog-row { margin-bottom: 12px; }
+  .prog-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+
+  /* Invest goal */
+  .inv-prog-bg { height: 8px; background: var(--surface2); border-radius: 8px; overflow: hidden; margin-bottom: 8px; }
+  .inv-prog-fill { height: 100%; background: #27AE60; border-radius: 8px; transition: width .4s; }
+
+  /* Table */
+  .data-table { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .data-table table { table-layout: fixed; }
+  .data-table th { text-align: left; padding: 10px 14px; font-size: 12px; font-weight: 500; color: var(--text2); cursor: pointer; user-select: none; background: var(--surface2); white-space: nowrap; }
+  .data-table th.right { text-align: right; }
+  .data-table td { padding: 10px 14px; font-size: 13px; border-top: 0.5px solid var(--border); }
+  .data-table tr:nth-child(even) td { background: var(--surface2); }
+  .td-desc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .td-amount { text-align: right; font-weight: 500; }
+
+  /* Badges */
+  .bdg { font-size: 10px; border-radius: 4px; padding: 1px 5px; font-weight: 500; display: inline-block; }
+  .cat-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; background: var(--surface2); border-radius: 6px; padding: 2px 8px; }
+  .cat-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+  /* Buttons */
+  .btn { background: transparent; border: 0.5px solid var(--border2); border-radius: var(--radius-sm); padding: 5px 12px; font-size: 12px; color: var(--text); transition: background .15s; }
+  .btn:hover { background: var(--surface2); }
+  .btn-primary { background: #1a3a2a; color: #fff; border: none; border-radius: var(--radius-sm); padding: 5px 14px; font-size: 12px; font-weight: 500; }
+  .btn-primary:hover { background: #1e4530; }
+  .btn-sm { padding: 3px 10px; font-size: 12px; border-radius: 6px; border: 0.5px solid var(--border2); background: transparent; color: var(--text); }
+  .btn-sm:hover { background: var(--surface2); }
+  .btn-group { display: flex; gap: 8px; align-items: center; }
+
+  /* Month select */
+  .month-select { font-size: 13px; padding: 4px 10px; border-radius: var(--radius-sm); border: 0.5px solid var(--border2); background: var(--surface2); color: var(--text); cursor: pointer; }
+
+  /* Warn banner */
+  .warn-banner { background: #FFFBF0; border: 0.5px solid #F39C12; border-radius: var(--radius); padding: 14px 18px; margin-bottom: 16px; }
+  .warn-banner.dark-ok { background: #2a2310; border-color: #b8860b; }
+  .warn-item { background: var(--surface); border: 0.5px solid var(--border); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; }
+  .classify-pills { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
+  .classify-pill { font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 0.5px solid var(--border); background: var(--surface2); cursor: pointer; color: var(--text); }
+  .classify-pill:hover { background: var(--border); }
+
+  /* Upload zone */
+  .upload-zone { border: 1.5px dashed var(--border2); border-radius: var(--radius); padding: 32px 20px; text-align: center; cursor: pointer; transition: background .15s; }
+  .upload-zone:hover { background: var(--surface2); }
+  .upload-success { margin-top: 16px; background: #EAF3DE; border: 0.5px solid #639922; border-radius: 10px; padding: 12px 16px; }
+
+  /* Goal editor */
+  .goal-item { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 14px 18px; margin-bottom: 10px; }
+  .goal-header { display: flex; align-items: center; justify-content: space-between; }
+  .goal-left { display: flex; align-items: center; gap: 8px; }
+
+  /* History */
+  .view-toggle { display: flex; gap: 8px; margin-bottom: 16px; }
+  .view-btn { font-size: 13px; padding: 6px 14px; border-radius: var(--radius-sm); border: 0.5px solid var(--border); background: var(--surface2); color: var(--text); cursor: pointer; font-weight: 400; }
+  .view-btn.active { background: #1a3a2a; color: #fff; border-color: transparent; font-weight: 500; }
+  .cat-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .cat-filter-btn { font-size: 12px; padding: 4px 10px; border-radius: var(--radius-sm); border: 0.5px solid var(--border); background: var(--surface2); color: var(--text); cursor: pointer; }
+  .chart-legend { display: flex; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text2); }
+  .legend-swatch { width: 10px; height: 10px; border-radius: 2px; }
+  .chart-wrap { position: relative; height: 280px; }
+  .chart-wrap-sm { position: relative; height: 240px; }
+  .summary-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .summary-label { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+  .summary-value { font-size: 16px; font-weight: 600; }
+  .hist-table th, .hist-table td { padding: 9px 14px; font-size: 13px; }
+  .hist-table th { font-size: 12px; font-weight: 500; color: var(--text2); }
+  .hist-table td.right { text-align: right; }
+  .best-worst { border-radius: var(--radius); padding: 14px 16px; }
+  .bw-label { font-size: 12px; color: rgba(255,255,255,0.6); margin-bottom: 4px; }
+  .bw-value { font-size: 15px; font-weight: 600; }
+  .bw-sub { font-size: 13px; color: rgba(255,255,255,0.65); margin-top: 2px; }
+
+  /* Inputs */
+  input[type="number"], input[type="text"] {
+    background: var(--surface); border: 0.5px solid var(--border2); border-radius: 6px;
+    padding: 3px 8px; font-size: 13px; color: var(--text); outline: none;
+  }
+  input[type="number"]:focus, input[type="text"]:focus { border-color: #27AE60; }
+  .row-between { display: flex; justify-content: space-between; align-items: center; }
+  .row-gap { display: flex; align-items: center; gap: 8px; }
+  .section-label { font-size: 13px; color: var(--text2); margin-bottom: 12px; }
+  .card-title { font-size: 14px; font-weight: 500; margin-bottom: 16px; }
+  .mt-12 { margin-top: 12px; }
+  .mt-16 { margin-top: 16px; }
+  .mt-20 { margin-top: 20px; }
+  .mb-8  { margin-bottom: 8px; }
+  .mb-12 { margin-bottom: 12px; }
+  .mb-16 { margin-bottom: 16px; }
+  .mb-20 { margin-bottom: 20px; }
+  .flex-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  /* Colors */
+  .c-green { color: #27AE60; } .c-red { color: #E24B4A; }
+  .c-orange { color: #E67E22; } .c-purple { color: #8E44AD; }
+  .c-blue { color: #3266AD; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (max-width: 768px) {
+    /* Header */
+    .header { padding: 0 10px; }
+    .header-top { height: 48px; }
+    .logo-text { font-size: 15px; }
+
+    /* Nav: scrollable horizontal strip */
+    .nav {
+      gap: 0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      padding-bottom: 2px;
+    }
+    .nav::-webkit-scrollbar { display: none; }
+    .nav-btn {
+      flex-shrink: 0;
+      padding: 8px 10px;
+      font-size: 11px;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .nav-btn i { font-size: 14px; }
+
+    /* Content */
+    .content { padding: 12px 8px; }
+
+    /* Cards */
+    .card { padding: 12px 14px; }
+    .card-title { font-size: 15px; }
+
+    /* Metric grid: 2 columns on mobile */
+    .grid-4 { grid-template-columns: 1fr 1fr !important; gap: 8px; }
+    .grid-2 { grid-template-columns: 1fr; }
+    .metric-card { padding: 12px 14px; }
+    .metric-value { font-size: 18px; }
+
+    /* Highlights chips: wrap */
+    .highlights { flex-wrap: wrap; gap: 6px; }
+    .highlight-chip { padding: 8px 10px; font-size: 12px; }
+
+    /* Transaction table: horizontal scroll */
+    .data-table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .data-table table { min-width: 700px; }
+
+    /* Import grid: stack vertically */
+    .upload-grid { grid-template-columns: 1fr !important; }
+
+    /* Review table */
+    .review-table { overflow-x: auto; }
+    .review-table table { min-width: 800px; }
+
+    /* Progress bars */
+    .prog-row { padding: 6px 0; }
+
+    /* Month selector */
+    #monthSelect { font-size: 12px; padding: 4px 8px; }
+
+    /* Filter row inputs smaller */
+    .data-table thead tr:nth-child(2) input,
+    .data-table thead tr:nth-child(2) select {
+      font-size: 10px;
+      padding: 2px 4px;
+    }
+
+    /* Edit panel grid: 2 cols on mobile */
+    .edit-grid { grid-template-columns: 1fr 1fr !important; }
+  }
+
+  @media (max-width: 400px) {
+    .grid-4 { grid-template-columns: 1fr !important; }
+    .nav-btn span { display: none; }
+    .nav-btn { padding: 10px 12px; }
+  }
+  /* API key config */
+  .apikey-banner { background: #FFF8F0; border: 0.5px solid #F39C12; border-radius: var(--radius); padding: 14px 18px; margin-bottom: 20px; }
+  .apikey-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+  .apikey-input { flex: 1; font-size: 13px; padding: 6px 10px; border-radius: 8px; border: 0.5px solid var(--border2); background: var(--surface); color: var(--text); font-family: monospace; }
+  .apikey-input:focus { outline: none; border-color: #27AE60; }
+  .progress-log { background: var(--surface2); border-radius: 8px; padding: 12px 14px; margin-top: 12px; font-size: 12px; color: var(--text2); font-family: monospace; line-height: 1.8; max-height: 160px; overflow-y: auto; }
+  .progress-step { display: flex; align-items: flex-start; gap: 6px; }
+  .progress-step.done { color: #27AE60; }
+  .progress-step.active { color: var(--text); font-weight: 500; }
+  .progress-step.error { color: #E24B4A; }
+  .review-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  .review-table th { text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 500; color: var(--text2); background: var(--surface2); }
+  .review-table td { padding: 8px 10px; font-size: 12px; border-top: 0.5px solid var(--border); }
+  .review-table tr:hover td { background: var(--surface2); }
+  .cat-select { font-size: 12px; padding: 2px 6px; border-radius: 5px; border: 0.5px solid var(--border2); background: var(--surface); color: var(--text); cursor: pointer; max-width: 140px; }
+  .import-confirm { background: #EAF3DE; border: 0.5px solid #639922; border-radius: var(--radius); padding: 16px 18px; margin-top: 16px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div class="header-top">
+      <div class="logo">
+        <div class="logo-icon"><i class="ti ti-leaf" style="color:#4ade80;font-size:16px"></i></div>
+        <span class="logo-name">MoneyMap</span>
+        <span class="badge-saved">salvo</span>
+      </div>
+      <select class="month-select" id="monthSelect"></select>
+    </div>
+    <div class="nav">
+      <button class="nav-btn active" data-tab="dashboard"><i class="ti ti-layout-dashboard"></i>Dashboard</button>
+      <button class="nav-btn" data-tab="historico"><i class="ti ti-chart-line"></i>Histórico</button>
+      <button class="nav-btn" data-tab="transactions"><i class="ti ti-list"></i>Transações <span class="notif" id="unclassifiedBadge" style="display:none"></span></button>
+      <button class="nav-btn" data-tab="goals"><i class="ti ti-target"></i>Metas</button>
+      <button class="nav-btn" data-tab="upload"><i class="ti ti-upload"></i>Importar</button>
+      <button class="nav-btn" data-tab="projetos"><i class="ti ti-folder"></i>Projetos</button>
+      <button class="nav-btn" data-tab="config"><i class="ti ti-settings"></i>Config</button>
+    </div>
+  </div>
+  <div class="content">
+    <div id="dashboard"    class="tab-panel active"></div>
+    <div id="historico"    class="tab-panel"></div>
+    <div id="transactions" class="tab-panel"></div>
+    <div id="goals"        class="tab-panel"></div>
+    <div id="upload"       class="tab-panel"></div>
+    <div id="projetos"     class="tab-panel"></div>
+    <div id="config"       class="tab-panel"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+// ─── Supabase config — SUBSTITUA pelos valores do seu projeto ───────────────
+const SUPABASE_URL = 'https://fzezjjioieqfszuvwzfm.supabase.co/rest/v1/';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6ZXpqamlvaWVxZnN6dXZ3emZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NjQ2OTEsImV4cCI6MjA5NTM0MDY5MX0.MZnWwKg2XbtxuFhtlHQqq2ybfTMK0Ngj7wN0uLoN9iQ';
+const _sb = (SUPABASE_URL !== 'https://fzezjjioieqfszuvwzfm.supabase.co/rest/v1/')
+  ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+  : null;
+
+// ─── Storage abstraction: Supabase when configured, localStorage as fallback ─
+const DB = {
+  async get(key) {
+    if (!_sb) return localStorage.getItem(key);
+    const { data } = await _sb.from('fp_config').select('value').eq('key', key).single();
+    return data ? JSON.stringify(data.value) : null;
+  },
+  async set(key, value) {
+    if (!_sb) { localStorage.setItem(key, value); return; }
+    await _sb.from('fp_config').upsert({ key, value: JSON.parse(value), updated_at: new Date().toISOString() });
+  },
+  async remove(key) {
+    if (!_sb) { localStorage.removeItem(key); return; }
+    await _sb.from('fp_config').delete().eq('key', key);
+  }
+};
+
+// ─── Transaction helpers ──────────────────────────────────────────────────────
+async function saveTxToSupabase(txs) {
+  if (!_sb) return;
+  const rows = txs.map(t => ({
+    id:                  t.id,
+    date:                t.date,
+    original_date:       t.originalDate || null,
+    description:         t.description,
+    amount:              t.amount,
+    type:                t.type,
+    category:            t.category || null,
+    notes:               t.notes || null,
+    source_id:           t.sourceId || null,
+    source_name:         t.sourceName || null,
+    project_id:          t.projectId || null,
+    import_id:           t.importId || null,
+    is_additional_card:  t.isAdditionalCard || false,
+    raw_date:            t._rawDate || null,
+  }));
+  await _sb.from('fp_transactions').upsert(rows, { onConflict: 'id' });
+}
+
+async function loadTxFromSupabase() {
+  if (!_sb) return null;
+  const { data, error } = await _sb.from('fp_transactions').select('*').order('date', { ascending: false });
+  if (error || !data) return null;
+  return data.map(r => ({
+    id:               r.id,
+    date:             r.date,
+    originalDate:     r.original_date,
+    description:      r.description,
+    amount:           parseFloat(r.amount),
+    type:             r.type,
+    category:         r.category,
+    notes:            r.notes,
+    sourceId:         r.source_id,
+    sourceName:       r.source_name,
+    projectId:        r.project_id,
+    importId:         r.import_id,
+    isAdditionalCard: r.is_additional_card,
+    _rawDate:         r.raw_date,
+  }));
+}
+
+async function deleteTxByImportId(importId) {
+  if (!_sb) return;
+  await _sb.from('fp_transactions').delete().eq('import_id', importId);
+}
+
+async function deleteAllTx() {
+  if (!_sb) return;
+  await _sb.from('fp_transactions').delete().neq('id','__never__');
+}
+
+// ─── Data ────────────────────────────────────────────────────────────────────
+const CATEGORIES = [
+  { id:"supermercado",      label:"Supermercado",            icon:"ti-shopping-cart",       color:"#E8622A" },
+  { id:"transporte",        label:"Carro",                   icon:"ti-car",                 color:"#3266AD" },
+  { id:"saude",             label:"Saúde",                   icon:"ti-heart-rate-monitor",  color:"#2E9E6E" },
+  { id:"lazer",             label:"Lazer",                   icon:"ti-mood-smile",          color:"#9B59B6" },
+  { id:"viagem",            label:"Viagem",                  icon:"ti-plane",               color:"#0891B2" },
+  { id:"moradia",           label:"Moradia",                 icon:"ti-home",                color:"#E67E22" },
+  { id:"educacao",          label:"Saulo - Educação",                icon:"ti-book",                color:"#1ABC9C" },
+  { id:"custo_fin_focus",   label:"Custo Financeiro Focus",  icon:"ti-chart-bar",           color:"#C0392B" },
+  { id:"custo_fin_pessoal", label:"Custo Financeiro Pessoal",icon:"ti-alert-triangle",      color:"#E74C3C" },
+  { id:"despesas_focus",    label:"Despesas Focus",          icon:"ti-building",            color:"#8E44AD" },
+  { id:"pessoais_saulo",    label:"Saulo - Pessoais",        icon:"ti-user",                color:"#2980B9" },
+  { id:"cachorros",         label:"Cachorros",               icon:"ti-paw",                 color:"#A0522D" },
+  { id:"serena_rotina",     label:"Serena - Rotina",         icon:"ti-baby-carriage",       color:"#E91E63" },
+  { id:"cartao_dani",       label:"Cartão Dani",             icon:"ti-credit-card",         color:"#9C27B0" },
+  { id:"inv_temp_cred",     label:"Invest Temp - Crédito",   icon:"ti-arrow-up-circle",     color:"#00ACC1" },
+  { id:"inv_temp_deb",      label:"Invest Temp - Débito",    icon:"ti-arrow-down-circle",   color:"#FF7043" },
+  { id:"inv_aporte",        label:"Investimento - Aporte",   icon:"ti-trending-up",         color:"#27AE60" },
+  { id:"inv_resgate",       label:"Investimento - Resgate",  icon:"ti-trending-up",         color:"#2ECC71" },
+  { id:"inv_lucro",         label:"Investimento - Lucro",    icon:"ti-sparkles",            color:"#00BCD4" },
+  { id:"outras_entradas",   label:"Outras entradas",          icon:"ti-plus",                color:"#16A085" },
+  { id:"aporte_empresa",    label:"Focus IT - Aporte",           icon:"ti-building-bank",       color:"#F39C12" },
+  { id:"retorno_aporte",    label:"Focus IT - Retorno",       icon:"ti-building-bank",       color:"#27AE60" },
+  { id:"receita",           label:"Receita / Entrada",       icon:"ti-cash",                color:"#16A085" },
+  { id:"transferencia",     label:"Transferência",           icon:"ti-arrows-exchange",     color:"#78909C" },
+  { id:"outros",            label:"Outros",                  icon:"ti-dots",                color:"#95A5A6" },
+]
+const EXPENSE_CATS = ["supermercado","transporte","saude","lazer","viagem","moradia","educacao","custo_fin_focus","custo_fin_pessoal","despesas_focus","pessoais_saulo","cachorros","cartao_dani","serena_rotina","inv_temp_cred","inv_temp_deb","inv_aporte","inv_resgate","inv_lucro","outras_entradas","outros"];
+// KEYWORD_MAP: carregado do localStorage para permitir customizações do usuário
+const DEFAULT_KEYWORD_MAP = {
+  supermercado: [
+    "supermercado","mercado","pão de açúcar","pao de acuca","pao acucar","carrefour",
+    "atacadão","atacadao","hortifruti","extra ","big","walmart","sam's club","sams club",
+    "prezunic","supernosso","bretas","condor","giassi","coop ","cooperativa",
+    "rede festval","angeloni","bistek","verdemar","super muffato","spani","tenda",
+    "assai","assaí","makro","atacarejo","maxxi","fort atacadista","roldao","roldão",
+    "dia %","mini mercado","mercearia","quitanda","feira livre","sacolão","hortifruti"
+  ],
+  transporte: [
+    "uber","99app","cabify","posto","gasolina","combustivel","combustível",
+    "estacionamento","estapar","multipark","parking","pedágio","pedagio","sem parar","veloe","conectcar",
+    "metrô","metro","ônibus","onibus","passagem","latam","gol","azul","decolar",
+    "transfer","táxi","taxi","detran","ipva","renavam","seguro auto","dpvat",
+    "autopass","move mais","bike itaú","bom tempo","bilhete único","bilhete unico",
+    "raizen","br ped","posto br","posto shell","posto ipiranga","ipiranga",
+    "shell","ale combustivel","petrobras distrib","grazziotin","localiza","movida","unidas",
+    "zipcar","driver","99taxi","indriver","indrive","waze carpool"
+  ],
+  saude: [
+    "farmácia","farmacia","drogasil","ultrafarma","panvel","droga raia","drogaria",
+    "droganossa","raia","pacheco","droga","laboratorio","laboratório","lavoisier","fleury",
+    "hospital","clinica","clínica","pronto socorro","ubs","upa","hc ","einstein","sirio",
+    "médico","medico","dentista","ortodontia","psicólogo","psicologo","terapeuta","psiquiatra",
+    "plano de saude","plano de saúde","unimed","amil","hapvida","notredame","sulamerica saude",
+    "bradesco saude","porto seguro saude","nossa saude","mediservice","gndi","prevent senior",
+    "academia","gym","smart fit","bodytech","bio ritmo","bluefit","selfit","fitdance","crossfit",
+    "exame","consulta","cirurgia","procedimento","vacina","ortopedia","cardiologia","pediatria",
+    "fonoaudiologia","nutricionista","fisioterapia","pilates","yoga","meditacao",
+    "drogaria sp","droga mais","ultrafarma"
+  ],
+  lazer: [
+    "netflix","spotify","amazon prime","hbo","disney","apple tv","youtube premium",
+    "ingresso","cinemark","uci cinemas","kinoplex","cinesystem","cinema",
+    "teatro","show","festival","balada","boate","night","pub ","bar do",
+    "clube","associacao","associação","parque","zoologico","zoológico","aquário","aquario",
+    "jogos","steam","playstation","xbox","nintendo","epic games","origin","ea play",
+    "deezer","apple music","tidal","twitch","crunchyroll","globoplay","paramount",
+    "star plus","star+","mubi","telecine","apple arcade","google play games",
+    "museu","exposição","exposicao","galeria","ingressos","show do",
+    "chuck e cheese","bowling","laser tag","karting","paintball",
+    "restaurante","ifood","rappi","uber eats","padaria","mcdonalds","mcdonald",
+    "burger","pizza","sushi","delivery","lanchonete","subway","outback","madero","spoleto",
+    "giraffas","bob's","bobs","kfc","popeyes","taco bell","dominos","domino",
+    "panificadora","confeitaria","sorveteria","açaí","acai","empório","emporio",
+    "churrascaria","buffet","bar ","boteco","taberna","cantina","trattoria",
+    "send food","santa massa","coco bambu","ifd*","ifood*","amazon fresh",
+    "starbucks","starbuck","cafeteria","café","cafe ","bakery","pag*","pg *"
+  ],
+  viagem: [
+    "hotel","pousada","hostel","resort","airbnb","booking","expedia","trivago","hotels",
+    "latam ","gol ","azul ","avianca","tam ","voo ","passagem aérea","passagem aerea",
+    "aeroporto","embarque","cia aerea","companhia aérea",
+    "aluguel de carro","localiza","movida","unidas","hertz","avis","budget","car rental",
+    "cruzeiro","msc ","royal caribbean","carnival","costa cruzeiros",
+    "excursão","excursao","pacote viagem","cvc viagens","decolar","submarino viagens",
+    "hostelworld","hihostels","transfer aeroporto","taxi aeroporto","gol linhas",
+    "uber aeroporto","viagem ","trip ","turismo","ecoturismo"
+  ],
+  moradia: [
+    "condomínio","condominio","aluguel","iptu","prest fin imob","prestacao fin imob","financiamento imob","energia","enel","cpfl","equatorial","neoenergia",
+    "cemig","celesc","coelba","cosern","elektro","eletropaulo","light ","ampla",
+    "água","agua","sabesp","caesb","copasa","cagece","compesa","cedae","sanepar","casan",
+    "gas","comgás","comgas","naturgy","gás encanado",
+    "internet","vivo","claro","oi ","tim ","net ","sky ","starlink","anatel",
+    "telefone","celular","plano celular","tim black","vivo controle","claro controle",
+    "seguro residencial","porto seguro","liberty","mapfre","azul seguros",
+    "financiamento","prestação imóvel","prestacao imovel","caixa economica","itau imob",
+    "taxa condomínio","taxa condominio","administradora","sindico"
+  ],
+  educacao: [
+    "escola","colegio","colégio","faculdade","universidade","uni ","puc ","usp ","fgv ",
+    "insper","ibmec","espm","fiap","fatec","etec","senai","senac","sesc ",
+    "curso","cursinho","pré-vestibular","pre vestibular","vestibular",
+    "livro","livraria","cultura","saraiva","amazon livros","fnac",
+    "udemy","coursera","alura","dio ","rocketseat","origamid","hotmart","monetizze",
+    "escola de idiomas","cultura inglesa","wizard","fisk","ccaa","cel.lep","yázigi",
+    "mentoria","workshop","bootcamp","treinamento","capacitação","capacitacao",
+    "matrícula","matricula","mensalidade escola","mensalidade faculdade",
+    "material escolar","papelaria","kalunga","office","staples"
+  ],
+  roupas: [
+    "renner","riachuelo","c&a","hering","zara","farm ","amaro","shein","shopee",
+    "centauro","netshoes","decathlon","nike","adidas","puma","under armour","mizuno",
+    "sapato","calçado","calcado","shoe","tênis","tenis","sapatilha","bota",
+    "roupa","vestuário","vestuario","moda","fashion","grife","polo","lacoste","ralph lauren",
+    "cea ","marisa","leader","pernambucanas","besni","leader magazine","arezzo","schutz",
+    "luigi bertolli","forum","cavalera","ellus","colcci","le lis blanc","alice ferraz",
+    "iorane","animale","shoulder","mixed","bo.bô","bobô","adriana degreas",
+    "lingerie","meias","cueca","underwear","sutiã","sutiã"
+  ],
+  servicos: [
+    "contabilidade","contador","advocacia","advogado","consultor","consultoria",
+    "manutenção","manutencao","limpeza","dedetização","dedetizacao","desentupimento",
+    "lavanderia","laundry","tintoraria","passadeira",
+    "pet shop","veterinário","veterinario","petlove","petz","cobasi","banho e tosa",
+    "seguro de vida","previdência","previdencia","pgbl","vgbl","icatu","brasilprev",
+    "cartório","cartorio","registro","notarial","tabelionato",
+    "assinatura","software","saas","adobe","microsoft 365","google one","dropbox","icloud",
+    "correios","sedex","motoboy","logistica","frete","delivery express",
+    "chaveiro","serralheiro","eletricista","encanador","pedreiro","pintor",
+    "seguro","allianz","porto seguro","sulamérica","sulamerica","mapfre","tokio marine",
+    "webmotors","olx","mercado livre anuncio","shopify","stripe","paypal taxa",
+    "jusbrasil","legalzoom","cartão anuidade","anuidade cartão","anuidade cartao",
+    "juros","mora","iof ","multa ","financiamento cartão","parcelado","encargo",
+    "juros de mora","iof de financiamento","juros de financiamento","multa por atraso","encargos de atraso"
+  ],
+  custo_fin_focus: [
+    "iof","iof de financiamento","iof compra","iof internacional","juros limite",
+    "juros rotativo","juros parcelamento","juros atraso focus","encargo focus",
+    "custo financeiro focus","financiamento focus","limite focus",
+    "enc lim credito","encargo limite credito","iof util limite","iof utilização limite"
+  ],
+  custo_fin_pessoal: [
+    "juros de mora","juros financiamento","multa por atraso","encargos de atraso",
+    "juros de financiamento","juros rotativo","mora cartão","mora cartao",
+    "multa atraso","encargo atraso","juro atraso","penalidade",
+    "tarifa bancaria","cesta prime","tarifa mensal","tarifa mensalidade","tarifa servico"
+  ],
+  despesas_focus: [],
+  pessoais_saulo: [],
+  cachorros:    ["petz","veterin","veterina","veterinário","veterinario","petlove","cobasi","banho e tosa","pet shop","agropet"],
+  serena_rotina: [],
+  inv_temp_cred: ["apl.invest fac","aplic.invest facil","apl invest fac","invest facil","invest fac"],
+  inv_temp_deb:  ["resgate inv fac","resgate invest fac","resgate fac"],
+  inv_aporte:  ["premio vgbl","vgbl","aplicacao cdb","aplicacao cdb di","cdb di","aporte cdb","invest cdb","aplicacao automatica","aplic invest","aplic.invest","pix transf l & s","pix transf l&s","pix l & s"],
+  inv_resgate: ["cor rendimento","resgate cdb","rendimento cdb","rend cdb","resgate invest","resgate automatico","remuneracao aplicacao automatica","resgate inv fac"],
+  inv_lucro: ["rent.inv.facil","rent.inv","rend.inv","rend pago aplic aut mais","rendimento investimento","rendimento automatico","rend invest fac"],
+  outras_entradas: [],
+  transferencia: [
+    "transferência para","transferencia para","ted para","pix para","doc para",
+    "transf para","transf.","transferência enviada","transferencia enviada",
+    "entre contas","envio pix","envio ted","remessa",
+    "transfe pix - rem: saulo","ted-t elet disp - remet.saulo luciano","transfe pix - des: saulo luciano",
+    "transfe pix","ted-t elet disp","remet.saulo"
+  ],
+  aporte_empresa: [
+    "aporte","transferência empresa","ted empresa","saída empresa","capital empresa","aporte sócio",
+    "mútuo","mutuo","empréstimo empresa","emprestimo empresa","pix transf rds"
+  ],
+  retorno_aporte: [
+    "retorno aporte","retorno empresa","devolução aporte","devol aporte","reembolso sócio","recebimento empresa",
+    "retorno mútuo","retorno mutuo","pix transf rds"
+  ],
+  receita: [
+    "salário","salario","pró-labore","pro-labore","pro labore","prolabore",
+    "dividendo","distribuição","distribuicao","lucro","receita","rendimento","renda",
+    "honorário","honorario","freelance","pgto recebido","pagamento recebido",
+    "transferência recebida","transferencia recebida","pix recebido","ted recebido",
+    "reembolso","estorno","crédito em conta","credito em conta","devolução","devolucao",
+    "restituição","restituicao","saque poupança","resgate","rendimento poupança"
+  ],
+};
+// Merge with any user-saved custom keywords
+function loadKeywordMap() {
+  const saved = localStorage.getItem("fp:keywords");
+  if (!saved) return DEFAULT_KEYWORD_MAP;
+  try {
+    const custom = JSON.parse(saved);
+    const merged = {};
+    for (const k of Object.keys(DEFAULT_KEYWORD_MAP)) {
+      merged[k] = [...new Set([...(DEFAULT_KEYWORD_MAP[k]||[]), ...(custom[k]||[])])];
+    }
+    // also include any extra user-created category keywords
+    for (const k of Object.keys(custom)) {
+      if (!merged[k]) merged[k] = custom[k];
+    }
+    return merged;
+  } catch { return DEFAULT_KEYWORD_MAP; }
+}
+let KEYWORD_MAP = loadKeywordMap();
+const DEFAULT_GOALS = { supermercado:2000,transporte:800,saude:600,lazer:1000,viagem:500,moradia:3500,educacao:500,roupas:400,servicos:300,custo_fin_focus:200,custo_fin_pessoal:200,despesas_focus:500,pessoais_saulo:500,outros:300 };
+// Sem dados de exemplo — sistema inicia zerado
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let transactions = JSON.parse(localStorage.getItem("fp:tx"))    || [];
+let goals        = JSON.parse(localStorage.getItem("fp:goals")) || DEFAULT_GOALS;
+let invGoal      = JSON.parse(localStorage.getItem("fp:inv"))   || 3000;
+let activeTab    = "dashboard";
+const _now = new Date();
+let filterMonth  = _now.getFullYear() + "-" + String(_now.getMonth()+1).padStart(2,"0");
+let sortField    = "date";
+let sortDir      = "desc";
+let txFilters    = { date:"", description:"", category:"", source:"", amount:"", notes:"", dani:"" };
+let editingTx    = null;
+let editGoalId   = null;
+let editingTxId  = null;
+let histView     = "overview";
+let histCat      = "alimentacao";
+let overviewChart = null;
+let catChart      = null;
+let projects = JSON.parse(localStorage.getItem('fp:projects') || '[]');
+let sources  = JSON.parse(localStorage.getItem('fp:sources')  || '[]');
+
+function save() {
+  localStorage.setItem("fp:tx",       JSON.stringify(transactions));
+  localStorage.setItem("fp:goals",    JSON.stringify(goals));
+  localStorage.setItem("fp:inv",      JSON.stringify(invGoal));
+  localStorage.setItem("fp:projects", JSON.stringify(projects));
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+// Returns CATEGORIES sorted alphabetically by label, with system cats optionally excluded
+function sortedCats(excludeSystem) {
+  const systemOnly = ["receita","aporte_empresa","retorno_aporte"];
+  return [...CATEGORIES]
+    .filter(c => !excludeSystem || !systemOnly.includes(c.id))
+    .sort((a,b) => a.label.localeCompare(b.label, 'pt-BR'));
+}
+
+function catOptionsHTML(selectedId, excludeSystem) {
+  return sortedCats(excludeSystem)
+    .map(c => '<option value="' + c.id + '"' + (selectedId === c.id ? ' selected' : '') + '>' + c.label + '</option>')
+    .join('');
+}
+
+function fmt(v) { return new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(v||0); }
+function fmtDate(d) { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"}); }
+function monthLabel(ym) { const [y,m]=ym.split("-"); return new Date(+y,+m-1,1).toLocaleDateString("pt-BR",{month:"short",year:"2-digit"}); }
+function monthLong(ym)  { const [y,m]=ym.split("-"); return new Date(+y,+m-1,1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"}); }
+function uid() { return Math.random().toString(36).substr(2,9); }
+function detectCat(desc, amount) {
+  const l=(desc||"").toLowerCase();
+  for(const [id,kws] of Object.entries(KEYWORD_MAP)) {
+    if(kws.some(k=>l.includes(k))) {
+      // Amount-based override: "pix transf rds" → aporte if negative, retorno if positive
+      if(l.includes("pix transf rds")) {
+        return (amount !== undefined && amount >= 0) ? "retorno_aporte" : "aporte_empresa";
+      }
+      return id;
+    }
+  }
+  return null;
+}
+function getSummary(txs) {
+  // EXCLUDED = categories shown in highlights section, not in expense bars
+  const EXCLUDED = ["aporte_empresa","retorno_aporte","transferencia"];
+  // Categories that may have income-type (positive) transactions
+  const INCOME_CATS = ["inv_aporte","inv_resgate","inv_lucro","outras_entradas","inv_temp_deb","inv_temp_cred"];
+  const income   = txs.filter(t=>t.category==="receita").reduce((s,t)=>s+t.amount,0);
+  const expenses = Math.abs(txs.filter(t=>t.type==="expense"&&!EXCLUDED.includes(t.category)&&!INCOME_CATS.includes(t.category)).reduce((s,t)=>s+t.amount,0));
+  const aportes  = Math.abs(txs.filter(t=>t.category==="aporte_empresa").reduce((s,t)=>s+t.amount,0));
+  const retornos = txs.filter(t=>t.category==="retorno_aporte").reduce((s,t)=>s+t.amount,0);
+  const transfers= Math.abs(txs.filter(t=>t.category==="transferencia").reduce((s,t)=>s+t.amount,0));
+  const balance  = income - expenses;
+  const additCard= Math.abs(txs.filter(t=>t.isAdditionalCard&&t.type==="expense").reduce((s,t)=>s+t.amount,0));
+  const byCategory={};
+  // Collect ALL transactions per category as NET balance (expense = negative contributes positively to spent,
+  // credits/refunds = positive reduce the category total). Result is the net amount spent.
+  txs.filter(t=>t.category&&!EXCLUDED.includes(t.category)).forEach(t=>{
+    // For expense-type: add abs(amount) to category total
+    // For income-type (refunds in expense cats): subtract from total
+    const contribution = t.type==="expense" ? Math.abs(t.amount) : -Math.abs(t.amount);
+    byCategory[t.category]=(byCategory[t.category]||0)+contribution;
+  });
+  return {income,expenses,aportes,retornos,transfers,balance,additCard,byCategory};
+}
+function allMonths() { return [...new Set(transactions.map(t=>t.date.slice(0,7)))].sort().reverse(); }
+function filteredTx() { return transactions.filter(t=>t.date.startsWith(filterMonth)); }
+function histData() {
+  const months=[...new Set(transactions.map(t=>t.date.slice(0,7)))].sort();
+  return months.map(m=>({month:m,...getSummary(transactions.filter(t=>t.date.startsWith(m)))}));
+}
+function cat(id) { return CATEGORIES.find(c=>c.id===id); }
+
+// ─── Render helpers ───────────────────────────────────────────────────────────
+function metricCard(label,value,sub,bg,tc) {
+  return `<div class="metric-card" style="background:${bg}">
+    <div class="metric-label">${label}</div>
+    <div class="metric-value" style="color:${tc}">${value}</div>
+    <div class="metric-sub">${sub}</div>
+  </div>`;
+}
+function summaryCard(label,value,c) {
+  return `<div class="summary-card"><div class="summary-label">${label}</div><div class="summary-value" style="color:${c}">${value}</div></div>`;
+}
+function bdg(text,bg,c) { return `<span class="bdg" style="background:${bg};color:${c}">${text}</span>`; }
+function progBar(spent,goal,color) {
+  const pct=goal>0?Math.min((spent/goal)*100,100):0;
+  const over=spent>goal&&goal>0;
+  return `<div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${pct}%;background:${over?"#E24B4A":color}"></div></div>`;
+}
+
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+function switchTab(id) {
+  activeTab=id;
+  document.querySelectorAll(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.tab===id));
+  document.querySelectorAll(".tab-panel").forEach(p=>p.classList.toggle("active",p.id===id));
+  renderActiveTab();
+}
+
+function renderActiveTab() {
+  if(activeTab==="dashboard")    renderDashboard();
+  if(activeTab==="historico")    renderHistorico();
+  if(activeTab==="transactions") renderTransactions();
+  if(activeTab==="goals")        renderGoals();
+  if(activeTab==="upload")       renderUpload();
+  if(activeTab==="config")       renderConfig();
+  if(activeTab==="projetos")     renderProjetos();
+  updateUnclassifiedBadge();
+}
+
+// ─── Month select ─────────────────────────────────────────────────────────────
+function buildMonthSelect() {
+  const sel=document.getElementById("monthSelect");
+  const months=[...new Set([filterMonth,...allMonths()])].sort().reverse();
+  sel.innerHTML=months.map(m=>`<option value="${m}" ${m===filterMonth?"selected":""}>${monthLong(m)}</option>`).join("");
+}
+function updateMonthSelect() {
+  const sel=document.getElementById("monthSelect");
+  const cur=sel.value;
+  sel.innerHTML=allMonths().map(m=>`<option value="${m}" ${m===filterMonth?"selected":""}>${monthLong(m)}</option>`).join("");
+}
+
+function updateUnclassifiedBadge() {
+  const n=filteredTx().filter(t=>!t.category).length;
+  const b=document.getElementById("unclassifiedBadge");
+  b.style.display=n>0?"":"none"; b.textContent=n;
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+function toggleHighlightDetail(key) {
+  var detail  = document.getElementById("highlightDetail_" + key);
+  var chevron = document.getElementById("chevron_" + key);
+  if (!detail) return;
+  var isOpen = detail.style.display !== "none";
+  detail.style.display  = isOpen ? "none" : "block";
+  if (chevron) chevron.style.transform = isOpen ? "" : "rotate(180deg)";
+}
+
+function toggleCatDetail(cid) {
+  const detail  = document.getElementById("catDetail_" + cid);
+  const chevron = document.getElementById("chevron_" + cid);
+  if (!detail) return;
+  const isOpen = detail.style.display !== "none";
+  detail.style.display  = isOpen ? "none" : "block";
+  if (chevron) chevron.style.transform = isOpen ? "" : "rotate(180deg)";
+}
+
+function renderDashboard() {
+  const txs=filteredTx(), s=getSummary(txs);
+  if(transactions.length===0) {
+    document.getElementById("dashboard").innerHTML=`<div style="text-align:center;padding:60px 20px">
+      <i class="ti ti-upload" style="font-size:48px;color:var(--text3);display:block;margin-bottom:16px"></i>
+      <div style="font-size:16px;font-weight:500;margin-bottom:8px">Nenhuma transação ainda</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:20px">Importe seus extratos e faturas para começar</div>
+      <button class="btn-primary" onclick="switchTab('upload')" style="padding:8px 20px;font-size:14px">Ir para Importar</button>
+    </div>`;
+    return;
+  }
+  let html=`<div class="grid-4">
+    ${metricCard("Receitas",fmt(s.income),"mês","#1a3a2a","#4ade80")}
+    ${metricCard("Despesas",fmt(s.expenses),"mês","#3a1a1a","#f87171")}
+    ${metricCard("Saldo",fmt(s.balance),"líquido",s.balance>=0?"#1a3a2a":"#3a1a1a",s.balance>=0?"#4ade80":"#f87171")}
+    ${metricCard("Meta reserva",fmt(invGoal),"mensal","#1a2a3a","#60a5fa")}
+  </div>`;
+
+  if(s.aportes>0||s.retornos>0||s.transfers>0) {
+    html+=`<div class="highlights">
+      ${s.aportes>0?`<div class="highlight-chip" style="cursor:pointer" onclick="toggleHighlightDetail('aportes')"><div class="dot" style="background:#F39C12"></div><span style="font-size:13px;color:var(--text2)">Focus IT - Aporte</span><span style="font-size:14px;font-weight:500;color:#E67E22">–${fmt(s.aportes)}</span><i class="ti ti-chevron-down" id="chevron_aportes" style="font-size:11px;color:var(--text3);transition:transform .2s"></i></div>`:""}
+      ${s.retornos>0?`<div class="highlight-chip" style="cursor:pointer" onclick="toggleHighlightDetail('retornos')"><div class="dot" style="background:#8E44AD"></div><span style="font-size:13px;color:var(--text2)">Focus IT - Retorno</span><span style="font-size:14px;font-weight:500;color:#8E44AD">+${fmt(s.retornos)}</span><i class="ti ti-chevron-down" id="chevron_retornos" style="font-size:11px;color:var(--text3);transition:transform .2s"></i></div>`:""}
+      ${s.transfers>0?`<div class="highlight-chip" style="cursor:pointer" onclick="toggleHighlightDetail('transfers')"><div class="dot" style="background:#78909C"></div><span style="font-size:13px;color:var(--text2)">Transferências entre contas</span><span style="font-size:14px;font-weight:500;color:#78909C">–${fmt(s.transfers)}</span><i class="ti ti-chevron-down" id="chevron_transfers" style="font-size:11px;color:var(--text3);transition:transform .2s"></i></div>`:""}
+    </div>
+    <div id="highlightDetail_aportes" style="display:none;margin-top:8px;background:var(--surface2);border-radius:8px;padding:10px 14px">
+      ${filteredTx().filter(t=>t.category==="aporte_empresa").sort((a,b)=>b.date.localeCompare(a.date)).map(t=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-top:0.5px solid var(--border)">
+          <div><div style="font-size:12px">${t.description}</div><div style="font-size:10px;color:var(--text3)">${fmtDate(t.date)}</div></div>
+          <span style="font-size:12px;font-weight:500;color:#E67E22;white-space:nowrap;margin-left:8px">${fmt(t.amount)}</span>
+        </div>`).join("")}
+    </div>
+    <div id="highlightDetail_retornos" style="display:none;margin-top:8px;background:var(--surface2);border-radius:8px;padding:10px 14px">
+      ${filteredTx().filter(t=>t.category==="retorno_aporte").sort((a,b)=>b.date.localeCompare(a.date)).map(t=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-top:0.5px solid var(--border)">
+          <div><div style="font-size:12px">${t.description}</div><div style="font-size:10px;color:var(--text3)">${fmtDate(t.date)}</div></div>
+          <span style="font-size:12px;font-weight:500;color:#8E44AD;white-space:nowrap;margin-left:8px">+${fmt(t.amount)}</span>
+        </div>`).join("")}
+    </div>
+    <div id="highlightDetail_transfers" style="display:none;margin-top:8px;background:var(--surface2);border-radius:8px;padding:10px 14px">
+      ${filteredTx().filter(t=>t.category==="transferencia").sort((a,b)=>b.date.localeCompare(a.date)).map(t=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-top:0.5px solid var(--border)">
+          <div><div style="font-size:12px">${t.description}</div><div style="font-size:10px;color:var(--text3)">${fmtDate(t.date)}</div></div>
+          <span style="font-size:12px;font-weight:500;color:#78909C;white-space:nowrap;margin-left:8px">${fmt(t.amount)}</span>
+        </div>`).join("")}
+    </div>`;
+  }
+
+  html+=`<div class="card mb-20"><div class="row-between mb-16"><span class="card-title" style="margin:0">Gastos por categoria</span><span style="font-size:12px;color:var(--text2)">vs meta · clique para detalhar</span></div>`;
+  [...EXPENSE_CATS].sort((a,b)=>{const ca=cat(a),cb=cat(b);return (ca?.label||a).localeCompare(cb?.label||b,'pt-BR');}).forEach(cid=>{
+    const c=cat(cid), spent=s.byCategory[cid]||0, goal=goals[cid]||0, over=spent>goal&&goal>0;
+    const catTxs=filteredTx().filter(t=>t.category===cid).sort((a,b)=>b.date.localeCompare(a.date));
+    const detailRows=catTxs.slice(0,10).map(t=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 2px;border-top:0.5px solid var(--border)">
+        <div style="overflow:hidden;flex:1;min-width:0">
+          <div style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.description}</div>
+          <div style="font-size:10px;color:var(--text3)">${fmtDate(t.date)}${t.sourceName?' · '+t.sourceName:''}</div>
+        </div>
+        <span style="font-size:12px;font-weight:500;color:#E24B4A;white-space:nowrap;margin-left:10px">${fmt(t.amount)}</span>
+      </div>`).join("");
+    const moreMsg=catTxs.length>10?`<div style="font-size:11px;color:var(--text3);padding:5px 0;text-align:center">+ ${catTxs.length-10} mais lançamentos</div>`:"";
+    html+=`<div class="prog-row">
+      <div class="prog-header" style="cursor:pointer" onclick="toggleCatDetail('${cid}')">
+        <div class="row-gap"><i class="ti ${c.icon}" style="font-size:14px;color:${c.color}"></i><span style="font-size:13px">${c.label}</span></div>
+        <div class="row-gap">
+          <span style="font-size:12px;color:${spent<0?"#27AE60":over?"#E24B4A":"var(--text2)"}">${spent<0?"crédito líquido "+fmt(Math.abs(spent)):fmt(spent)}</span>
+          <span style="font-size:11px;color:var(--text2)">/ ${fmt(goal)}</span>
+          <i class="ti ti-chevron-down" id="chevron_${cid}" style="font-size:11px;color:var(--text3);transition:transform .2s"></i>
+        </div>
+      </div>
+      ${progBar(spent,goal,c.color)}
+      <div id="catDetail_${cid}" style="display:none;margin-top:4px">
+        ${catTxs.length===0
+          ?'<div style="font-size:12px;color:var(--text3);padding:6px 0">Nenhum lançamento nesta categoria este mês.</div>'
+          :detailRows+moreMsg}
+      </div>
+    </div>`;
+  });
+  html+=`</div>`;
+
+  // Cartão adicional card — below category bars
+  if (s.additCard > 0) {
+    html+=`<div class="card mb-20" style="border-left:3px solid #E91E63">
+      <div class="row-between">
+        <div class="row-gap">
+          <div class="dot" style="background:#E91E63;width:10px;height:10px;border-radius:50%"></div>
+          <span style="font-size:14px;font-weight:500">Cartão adicional (esposa)</span>
+        </div>
+        <span style="font-size:20px;font-weight:600;color:#E91E63">–${fmt(s.additCard)}</span>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:var(--text2)">
+        ${transactions.filter(t=>t.isAdditionalCard&&t.type==="expense"&&t.date.startsWith(filterMonth)).slice(0,3).map(t=>`
+          <div class="row-between" style="padding:4px 0;border-top:0.5px solid var(--border)">
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%">${t.description}</span>
+            <span style="color:#E24B4A;font-weight:500">${fmt(t.amount)}</span>
+          </div>`).join("")}
+      </div>
+    </div>`;
+  }
+
+  const pct=Math.min((s.balance/invGoal)*100,100);
+  const msg=s.balance>=invGoal?`✓ Meta atingida! Sobram ${fmt(s.balance-invGoal)} além da meta.`:s.balance>0?`Faltam ${fmt(invGoal-s.balance)} para atingir a meta.`:"Saldo insuficiente para atingir a meta este mês.";
+  html+=`<div class="card">
+    <div class="row-gap mb-12"><i class="ti ti-trending-up" style="font-size:16px;color:#27AE60"></i><span class="card-title" style="margin:0">Meta de reserva para investimento</span></div>
+    <div class="row-between mb-8"><span style="font-size:13px;color:var(--text2)">Disponível para reservar</span><span style="font-size:14px;font-weight:500;color:${s.balance>0?"#27AE60":"#E24B4A"}">${fmt(s.balance)}</span></div>
+    <div class="row-between mb-8"><span style="font-size:13px;color:var(--text2)">Meta mensal</span><span style="font-size:14px;font-weight:500">${fmt(invGoal)}</span></div>
+    <div class="inv-prog-bg"><div class="inv-prog-fill" style="width:${pct}%"></div></div>
+    <div style="font-size:12px;color:var(--text2)">${msg}</div>
+  </div>`;
+
+  document.getElementById("dashboard").innerHTML=html;
+}
+
+// ─── Historico ────────────────────────────────────────────────────────────────
+function renderHistorico() {
+  const hd=histData();
+  const avgIncome  =hd.length?Math.round(hd.reduce((s,d)=>s+d.income,0)/hd.length):0;
+  const avgExpenses=hd.length?Math.round(hd.reduce((s,d)=>s+d.expenses,0)/hd.length):0;
+  const avgBalance =hd.length?Math.round(hd.reduce((s,d)=>s+d.balance,0)/hd.length):0;
+  const totAportes =hd.reduce((s,d)=>s+d.aportes,0);
+  const totRetornos=hd.reduce((s,d)=>s+d.retornos,0);
+  const best =hd.length?[...hd].sort((a,b)=>b.balance-a.balance)[0]:null;
+  const worst=hd.length?[...hd].sort((a,b)=>a.balance-b.balance)[0]:null;
+
+  let html=`<div class="grid-5">
+    ${summaryCard("Receita média/mês",fmt(avgIncome),"#2E9E6E")}
+    ${summaryCard("Gasto médio/mês",fmt(avgExpenses),"#E24B4A")}
+    ${summaryCard("Saldo médio/mês",fmt(avgBalance),avgBalance>=0?"#3266AD":"#E24B4A")}
+    ${summaryCard("Total aportes",fmt(totAportes),"#F39C12")}
+    ${summaryCard("Total retornos",fmt(totRetornos),"#8E44AD")}
+  </div>`;
+
+  if(best&&worst) html+=`<div class="grid-2">
+    <div class="best-worst" style="background:#1a3a2a"><div class="bw-label">Melhor mês</div><div class="bw-value" style="color:#4ade80">${monthLong(best.month)}</div><div class="bw-sub">Saldo ${fmt(best.balance)}</div></div>
+    <div class="best-worst" style="background:#3a1a1a"><div class="bw-label">Pior mês</div><div class="bw-value" style="color:#f87171">${monthLong(worst.month)}</div><div class="bw-sub">Saldo ${fmt(worst.balance)}</div></div>
+  </div>`;
+
+  html+=`<div class="view-toggle">
+    <button class="view-btn ${histView==="overview"?"active":""}" onclick="setHistView('overview')">Visão geral</button>
+    <button class="view-btn ${histView==="category"?"active":""}" onclick="setHistView('category')">Por categoria</button>
+  </div>`;
+
+  if(histView==="overview") {
+    html+=`<div class="card mb-20">
+      <div class="chart-legend">
+        <div class="legend-item"><div class="legend-swatch" style="background:#27AE60"></div>Receitas</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#E24B4A"></div>Despesas</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#60a5fa"></div>Saldo (linha)</div>
+      </div>
+      <div class="chart-wrap"><canvas id="overviewChart" role="img" aria-label="Receitas, despesas e saldo por mês"></canvas></div>
+    </div>`;
+  } else {
+    const catBtns=EXPENSE_CATS.map(cid=>{
+      const c=cat(cid);
+      const isActive=histCat===cid;
+      return `<button class="cat-filter-btn" style="${isActive?`background:${c.color};color:#fff;border-color:transparent`:""}" onclick="setHistCat('${cid}')">${c.label}</button>`;
+    }).join("");
+    html+=`<div class="card mb-20">
+      <div class="cat-filter">${catBtns}</div>
+      <div class="chart-legend">
+        <div class="legend-item"><div class="legend-swatch" style="background:${cat(histCat)?.color||"#888"}"></div>${cat(histCat)?.label}</div>
+        <div class="legend-item"><div class="legend-swatch" style="width:12px;height:2px;border-radius:0;border:1px dashed #aaa;background:transparent"></div>Meta</div>
+      </div>
+      <div class="chart-wrap-sm"><canvas id="catChart" role="img" aria-label="Gasto da categoria por mês"></canvas></div>
+    </div>`;
+  }
+
+  // Summary table
+  html+=`<div class="data-table"><div style="padding:14px 18px;border-bottom:0.5px solid var(--border);font-size:14px;font-weight:500">Resumo mensal</div>
+    <table class="hist-table"><thead><tr style="background:var(--surface2)">
+      <th>Mês</th><th class="right">Receitas</th><th class="right">Despesas</th><th class="right">Aportes</th><th class="right">Retornos</th><th class="right">Saldo</th>
+    </tr></thead><tbody>
+    ${[...hd].reverse().map((d,i)=>`<tr style="${i%2===0?"":"background:var(--surface2)"}">
+      <td style="font-weight:500">${monthLong(d.month)}</td>
+      <td class="right c-green">+${fmt(d.income)}</td>
+      <td class="right c-red">–${fmt(d.expenses)}</td>
+      <td class="right c-orange">${d.aportes>0?`–${fmt(d.aportes)}`:"–"}</td>
+      <td class="right c-purple">${d.retornos>0?`+${fmt(d.retornos)}`:"–"}</td>
+      <td class="right" style="font-weight:500;color:${d.balance>=0?"#27AE60":"#E24B4A"}">${d.balance>=0?"+":""}${fmt(d.balance)}</td>
+    </tr>`).join("")}
+    </tbody></table></div>`;
+
+  document.getElementById("historico").innerHTML=html;
+
+  // Draw charts after DOM update
+  setTimeout(()=>{
+    if(histView==="overview") drawOverviewChart(hd);
+    else drawCatChart(hd);
+  },50);
+}
+
+function setHistView(v) { histView=v; renderHistorico(); }
+function setHistCat(c)  { histCat=c;  renderHistorico(); }
+
+function drawOverviewChart(hd) {
+  const ctx=document.getElementById("overviewChart");
+  if(!ctx) return;
+  if(overviewChart) overviewChart.destroy();
+  overviewChart=new Chart(ctx,{
+    type:"bar",
+    data:{
+      labels:hd.map(d=>monthLabel(d.month)),
+      datasets:[
+        {label:"Receitas", data:hd.map(d=>Math.round(d.income)),   backgroundColor:"#27AE60",borderRadius:4,order:1},
+        {label:"Despesas", data:hd.map(d=>Math.round(d.expenses)), backgroundColor:"#E24B4A",borderRadius:4,order:1},
+        {label:"Saldo",    data:hd.map(d=>Math.round(d.balance)),  type:"line",borderColor:"#60a5fa",backgroundColor:"transparent",pointBackgroundColor:"#60a5fa",tension:0.35,order:0,pointRadius:4},
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:"#888",font:{size:11}},grid:{display:false}},
+              y:{ticks:{color:"#888",font:{size:11},callback:v=>"R$"+(Math.abs(v)>=1000?(v/1000).toFixed(0)+"k":v)},grid:{color:"rgba(128,128,128,0.12)"}}}}
+  });
+}
+
+function drawCatChart(hd) {
+  const ctx=document.getElementById("catChart");
+  if(!ctx) return;
+  if(catChart) catChart.destroy();
+  const c=cat(histCat);
+  catChart=new Chart(ctx,{
+    type:"bar",
+    data:{
+      labels:hd.map(d=>monthLabel(d.month)),
+      datasets:[
+        {label:c?.label, data:hd.map(d=>Math.round(d.byCategory[histCat]||0)), backgroundColor:c?.color||"#888",borderRadius:4,order:1},
+        {label:"Meta",   data:hd.map(()=>Math.round(goals[histCat]||0)), type:"line",borderColor:"#aaa",borderDash:[5,4],backgroundColor:"transparent",pointRadius:0,order:0},
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:"#888",font:{size:11}},grid:{display:false}},
+              y:{min:0,ticks:{color:"#888",font:{size:11},callback:v=>"R$"+(v>=1000?(v/1000).toFixed(0)+"k":v)},grid:{color:"rgba(128,128,128,0.12)"}}}}
+  });
+}
+
+// ─── Transactions ─────────────────────────────────────────────────────────────
+function renderTransactions() {
+  const txs=filteredTx();
+  const unclassified=txs.filter(t=>!t.category);
+
+  // Apply column filters
+  let sorted=[...txs].filter(t=>{
+    if(txFilters.date && !t.date.includes(txFilters.date)) return false;
+    if(txFilters.description && !(t.description||"").toLowerCase().includes(txFilters.description.toLowerCase())) return false;
+    if(txFilters.category) {
+      if(txFilters.category==="__unclassified__" && t.category) return false;
+      if(txFilters.category!=="__unclassified__" && t.category!==txFilters.category) return false;
+    }
+    if(txFilters.notes && !(t.notes||"").toLowerCase().includes(txFilters.notes.toLowerCase())) return false;
+    if(txFilters.dani === "yes" && !t.isAdditionalCard) return false;
+    if(txFilters.dani === "no"  &&  t.isAdditionalCard) return false;
+    if(txFilters.source && !(t.sourceName||"").toLowerCase().includes(txFilters.source.toLowerCase())) return false;
+    if(txFilters.amount) {
+      const op=txFilters.amount.trim();
+      const v=Math.abs(t.amount);
+      if(op.startsWith(">=")) { if(v < parseFloat(op.slice(2))) return false; }
+      else if(op.startsWith("<=")) { if(v > parseFloat(op.slice(2))) return false; }
+      else if(op.startsWith(">"))  { if(v <= parseFloat(op.slice(1))) return false; }
+      else if(op.startsWith("<"))  { if(v >= parseFloat(op.slice(1))) return false; }
+      else { if(!String(Math.abs(t.amount)).includes(op.replace(",","."))) return false; }
+    }
+    return true;
+  }).sort((a,b)=>{
+    let av=sortField==="amount"?Math.abs(a[sortField]):a[sortField];
+    let bv=sortField==="amount"?Math.abs(b[sortField]):b[sortField];
+    return (av<bv?-1:av>bv?1:0)*(sortDir==="asc"?1:-1);
+  });
+
+  // Active filters indicator
+  const anyFilter = Object.values(txFilters).some(v=>v!=="");
+  let html="";
+  if(anyFilter) {
+    html+=`<div style="margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:12px;color:var(--text2)">Filtros ativos · ${sorted.length} de ${txs.length} transações</span>
+      <button onclick="clearTxFilters()" style="font-size:11px;padding:2px 10px;border-radius:6px;border:0.5px solid #E24B4A;background:transparent;cursor:pointer;color:#E24B4A">✕ Limpar filtros</button>
+    </div>`;
+  }
+  if(unclassified.length) {
+    html+=`<div class="warn-banner mb-16">
+      <div class="row-gap mb-12"><i class="ti ti-alert-circle" style="font-size:16px;color:#E67E22"></i><span style="font-size:13px;font-weight:500;color:#7a4f0a">${unclassified.length} transação(ões) aguardando classificação</span></div>
+      ${unclassified.map(tx=>`
+        <div class="warn-item" id="warnItem_${tx.id}">
+          <div class="row-between">
+            <div>
+              <div style="font-size:13px;font-weight:500">${tx.description}</div>
+              <div style="font-size:12px;color:var(--text2)">${fmtDate(tx.date)} · ${fmt(tx.amount)}</div>
+            </div>
+            <button class="btn-sm" onclick="toggleClassify('${tx.id}')">Classificar</button>
+          </div>
+          <div class="classify-pills" id="classifyPills_${tx.id}" style="display:none">
+            ${sortedCats(true).map(c=>`<button class="classify-pill" onclick="doClassify('${tx.id}','${c.id}')">${c.label}</button>`).join("")}
+            <button class="classify-pill" onclick="document.getElementById('classifyPills_${tx.id}').style.display='none'">cancelar</button>
+          </div>
+        </div>`).join("")}
+    </div>`;
+  }
+
+  html+=`<div class="row-between mb-12">
+    <span style="font-size:13px;color:var(--text2)">${anyFilter ? sorted.length+" de "+txs.length+" transações" : sorted.length+" transações"}</span>
+    <button class="btn" onclick="exportCSV()"><i class="ti ti-download" style="font-size:13px"></i> Exportar CSV</button>
+  </div>
+  <div class="data-table">
+    <table style="table-layout:fixed">
+      <colgroup><col width="80"><col><col width="120"><col width="100"><col width="80"><col width="50"><col width="110"></colgroup>
+      <thead>
+        <tr>
+          <th onclick="setSort('date')">Data ${sortField==="date"?(sortDir==="asc"?"↑":"↓"):""}</th>
+          <th onclick="setSort('description')">Descrição ${sortField==="description"?(sortDir==="asc"?"↑":"↓"):""}</th>
+          <th onclick="setSort('category')">Categoria ${sortField==="category"?(sortDir==="asc"?"↑":"↓"):""}</th>
+          <th>Observação</th>
+          <th>Fonte</th>
+          <th style="text-align:center">Dani</th>
+          <th class="right" onclick="setSort('amount')">Valor ${sortField==="amount"?(sortDir==="asc"?"↑":"↓"):""}</th>
+        </tr>
+        <tr style="background:var(--surface2)">
+          <th style="padding:4px 8px;font-weight:400">
+            <input type="text" placeholder="🔍 data" value="${txFilters.date}"
+              oninput="txFilters.date=this.value;renderTransactions()"
+              style="width:100%;font-size:11px;padding:3px 6px;border-radius:5px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
+          </th>
+          <th style="padding:4px 8px;font-weight:400">
+            <input type="text" placeholder="🔍 descrição" value="${txFilters.description}"
+              oninput="txFilters.description=this.value;renderTransactions()"
+              style="width:100%;font-size:11px;padding:3px 6px;border-radius:5px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
+          </th>
+          <th style="padding:4px 8px;font-weight:400">
+            <select oninput="txFilters.category=this.value;renderTransactions()"
+              style="width:100%;font-size:11px;padding:3px 4px;border-radius:5px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
+              <option value="">🔍 todas</option>
+              <option value="__unclassified__">Sem categoria</option>
+              ${sortedCats(false).map(c=>`<option value="${c.id}" ${txFilters.category===c.id?"selected":""}>${c.label}</option>`).join("")}
+            </select>
+          </th>
+          <th style="padding:4px 8px;font-weight:400">
+            <input type="text" placeholder="🔍 obs" value="${txFilters.notes||''}"
+              oninput="txFilters.notes=this.value;renderTransactions()"
+              style="width:100%;font-size:11px;padding:3px 6px;border-radius:5px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
+          </th>
+          <th style="padding:4px 8px;font-weight:400">
+            <input type="text" placeholder="🔍 fonte" value="${txFilters.source}"
+              oninput="txFilters.source=this.value;renderTransactions()"
+              style="width:100%;font-size:11px;padding:3px 6px;border-radius:5px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
+          </th>
+          <th style="padding:4px 8px;font-weight:400;text-align:center">
+            <select oninput="txFilters.dani=this.value;renderTransactions()" style="width:100%;font-size:11px;padding:3px 4px;border-radius:5px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
+              <option value="">🔍 Dani</option>
+              <option value="yes" ${txFilters.dani==="yes"?"selected":""}>Sim</option>
+              <option value="no"  ${txFilters.dani==="no"?"selected":""}>Não</option>
+            </select>
+          </th>
+          <th style="padding:4px 8px;font-weight:400">
+            <input type="text" placeholder="🔍 ex: >100" value="${txFilters.amount}"
+              oninput="txFilters.amount=this.value;renderTransactions()"
+              style="width:100%;font-size:11px;padding:3px 6px;border-radius:5px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
+          </th>
+        </tr>
+      </thead><tbody>
+      ${sorted.map((tx,i)=>{
+        const c=cat(tx.category);
+        const amtColor=tx.amount>0?"#27AE60":tx.category==="aporte_empresa"?"#E67E22":tx.category==="transferencia"?"#78909C":"#E24B4A";
+        const isEditing = editingTxId === tx.id;
+        const catOpts = catOptionsHTML(tx.category, false);
+        return `<tr style="${i%2===0?"":"background:var(--surface2)"}">
+          <td style="font-size:12px">
+            <div style="color:var(--text2)">${fmtDate(tx.date)}</div>${tx.originalDate && tx.originalDate !== tx.date ? '<div style="font-size:10px;color:var(--text3);margin-top:1px" title="Data original do arquivo">' + tx.originalDate + '</div>' : ""}
+          </td>
+          <td>
+            <div class="td-desc">${tx.description}</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:2px">
+              ${tx.isAdditionalCard?bdg("Cartão adicional","#FCE4EC","#880E4F"):""}
+              ${tx.category==="aporte_empresa"?bdg("Focus IT - Aporte","#FFF3E0","#E65100"):""}
+              ${tx.category==="retorno_aporte"?bdg("Focus IT - Retorno","#F3E5F5","#4A148C"):""}
+              ${tx.category==="transferencia"?bdg("Transferência","#ECEFF1","#546E7A"):""}
+              ${tx.projectId?(function(){const p=projects.find(function(x){return x.id===tx.projectId;});return p?bdg("📁 "+p.name,p.color+"22",p.color):"";}()):""}
+            </div>
+          </td>
+          <td>
+            ${tx.category
+                ?`<span class="cat-pill"><span class="cat-dot" style="background:${c?.color||"#95A5A6"}"></span>${c?.label||"Outros"}</span>`
+                :`<button class="bdg" style="background:#FFF0E0;color:#E67E22;cursor:pointer;font-size:11px;border:0.5px solid #f0c58a" onclick="toggleClassifyInline('${tx.id}')">Classificar</button>`}
+          </td>
+          <td style="padding:8px 10px">
+            ${isEditing
+              ?`<input type="text" id="edit_notes_${tx.id}" value="${(tx.notes||'').replace(/"/g,'&quot;')}" maxlength="50" placeholder="Obs..." style="width:100%;font-size:11px;padding:2px 6px;border-radius:5px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">`
+              :`<span style="font-size:11px;color:var(--text2);cursor:pointer" onclick="startEditTx('${tx.id}')" title="Clique para editar">${tx.notes||'<span style=&quot;color:var(--text3)&quot;>—</span>'}</span>`}
+            ${!isEditing?`<div class="classify-pills" id="inlinePills_${tx.id}" style="display:none;margin-top:6px">
+              ${sortedCats(true).map(c=>`<button class="classify-pill" onclick="doClassify('${tx.id}','${c.id}')">${c.label}</button>`).join("")}
+              <button class="classify-pill" onclick="document.getElementById('inlinePills_${tx.id}').style.display='none'">cancelar</button>
+            </div>`:""}
+          </td>
+          <td style="padding:6px 10px;font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px" title="${tx.sourceName||''}">
+            ${tx.sourceName||''}
+          </td>
+          <td style="padding:6px 8px;text-align:center">
+            ${tx.isAdditionalCard?'<span style="font-size:14px" title="Cartão Dani">✓</span>':''}
+          </td>
+          <td class="td-amount" style="color:${amtColor};text-align:right">
+            ${!isEditing ? `<span>${tx.amount>0?"+":""}${fmt(tx.amount)}</span>
+               <button onclick="startEditTx('${tx.id}')" style="font-size:10px;padding:1px 5px;border-radius:4px;border:0.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text3);margin-left:4px" title="Editar">✏️</button>` : ""}
+          </td>
+        </tr>${isEditing ? `<tr style="background:var(--surface2)">
+          <td colspan="8" style="padding:14px 16px">
+            <div class="edit-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;align-items:end">
+              <div>
+                <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Data</div>
+                <input type="date" value="${tx.date}" id="edit_date_${tx.id}" style="width:100%;font-size:12px;padding:4px 8px;border-radius:6px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
+              </div>
+              <div style="grid-column:span 2">
+                <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Descrição</div>
+                <input type="text" value="${tx.description.replace(/"/g,'&quot;')}" id="edit_desc_${tx.id}" style="width:100%;font-size:12px;padding:4px 8px;border-radius:6px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Valor</div>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <select id="edit_sign_${tx.id}" style="font-size:12px;padding:4px 6px;border-radius:6px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
+                    <option value="neg" ${tx.amount<0?"selected":""}>− Débito</option>
+                    <option value="pos" ${tx.amount>=0?"selected":""}>+ Crédito</option>
+                  </select>
+                  <input type="number" id="edit_amount_${tx.id}" step="0.01" min="0" value="${Math.abs(tx.amount).toFixed(2)}" style="width:100px;font-size:12px;padding:4px 8px;border-radius:6px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
+                </div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Categoria</div>
+                <select id="edit_cat_${tx.id}" class="cat-select" style="width:100%"><option value="">— não classif. —</option>${catOpts}</select>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Observação</div>
+                <input type="text" id="edit_notes_${tx.id}" value="${(tx.notes||''  ).replace(/"/g,'&quot;')}" maxlength="50" style="width:100%;font-size:12px;padding:4px 8px;border-radius:6px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Projeto</div>
+                <select id="edit_proj_${tx.id}" class="cat-select" style="width:100%">
+                  <option value="">Sem projeto</option>
+                  ${projects.filter(p=>!p.archived).map(p=>'<option value="'+p.id+'"'+(tx.projectId===p.id?' selected':'')+'>'+p.name+'</option>').join("")}
+                </select>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px;justify-content:flex-end">
+                <label style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:5px;cursor:pointer">
+                  <input type="checkbox" id="edit_dani_${tx.id}" ${tx.isAdditionalCard?"checked":""}> Cartão Dani
+                </label>
+                <div style="display:flex;gap:8px">
+                  <button onclick="saveEditTx('${tx.id}')" style="font-size:12px;padding:5px 14px;border-radius:6px;border:none;background:#1a3a2a;color:#fff;cursor:pointer">✓ Salvar</button>
+                  <button onclick="cancelEditTx()" style="font-size:12px;padding:5px 14px;border-radius:6px;border:0.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text2)">Cancelar</button>
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>` : ""}
+        `;
+      }).join("")}
+      </tbody>
+    </table>
+  </div>`;
+
+  document.getElementById("transactions").innerHTML=html;
+}
+
+function startEditTx(id) {
+  editingTxId = id;
+  renderTransactions();
+}
+function cancelEditTx() {
+  editingTxId = null;
+  renderTransactions();
+}
+function saveEditTx(id) {
+  const tx = transactions.find(t => t.id === id);
+  if (!tx) return;
+  const newDate    = document.getElementById("edit_date_" + id)?.value;
+  const newDesc    = document.getElementById("edit_desc_" + id)?.value?.trim();
+  const newCat     = document.getElementById("edit_cat_" + id)?.value;
+  const newProject = document.getElementById("edit_proj_" + id)?.value;
+  const newNotes   = document.getElementById("edit_notes_" + id)?.value?.trim();
+  const newAmtRaw  = parseFloat(document.getElementById("edit_amount_" + id)?.value);
+  const newSign    = document.getElementById("edit_sign_" + id)?.value;
+  const newDani    = document.getElementById("edit_dani_" + id)?.checked;
+  if (newDate) tx.date = newDate;
+  if (newDesc) tx.description = newDesc.toUpperCase();
+  if (newCat !== undefined) tx.category = newCat || null;
+  if (newProject !== undefined) tx.projectId = newProject || undefined;
+  tx.notes = newNotes || "";
+  if (!isNaN(newAmtRaw) && newAmtRaw >= 0) {
+    tx.amount = newSign === "pos" ? newAmtRaw : -newAmtRaw;
+  }
+  tx.isAdditionalCard = newDani || false;
+  tx.type = tx.amount >= 0 ? "income" : "expense";
+  editingTxId = null;
+  save();
+  renderActiveTab();
+}
+function clearTxFilters() {
+  txFilters={date:"",description:"",category:"",source:"",amount:"",notes:"",dani:""};
+  renderTransactions();
+}
+
+function toggleClassify(id) {
+  const el=document.getElementById(`classifyPills_${id}`);
+  if(el) el.style.display=el.style.display==="none"?"flex":"none";
+}
+function toggleClassifyInline(id) {
+  const el=document.getElementById(`inlinePills_${id}`);
+  if(el) el.style.display=el.style.display==="none"?"flex":"none";
+}
+function doClassify(txId, catId) {
+  const tx=transactions.find(t=>t.id===txId);
+  if(tx) { tx.category=catId; save(); renderActiveTab(); }
+}
+function setSort(field) {
+  if(sortField===field) sortDir=sortDir==="asc"?"desc":"asc";
+  else { sortField=field; sortDir="asc"; }
+  renderTransactions();
+}
+function exportCSV() {
+  const txs=filteredTx();
+  const rows=[["Data","Descrição","Valor","Categoria","Cartão Adicional","Tipo"],...txs.map(t=>[
+    t.date,`"${t.description}"`,t.amount.toFixed(2).replace(".",","),
+    cat(t.category)?.label||"Não classificado",t.isAdditionalCard?"Sim":"Não",t.type==="income"?"Entrada":"Saída"
+  ])].map(r=>r.join(";")).join("\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob(["\uFEFF"+rows],{type:"text/csv;charset=utf-8;"}));
+  a.download=`financas-${filterMonth}.csv`; a.click();
+}
+
+// ─── Goals ────────────────────────────────────────────────────────────────────
+function renderGoals() {
+  const s=getSummary(filteredTx());
+  let html=`<div class="card mb-20">
+    <div class="row-between mb-12">
+      <div class="row-gap"><i class="ti ti-trending-up" style="font-size:16px;color:#27AE60"></i><span class="card-title" style="margin:0">Meta de investimento mensal</span></div>
+      <button class="btn-sm" onclick="editInvGoal()"><i class="ti ti-edit" style="font-size:13px"></i> Editar</button>
+    </div>
+    <div id="invGoalDisplay"><span style="font-size:28px;font-weight:600">${fmt(invGoal)}</span><span style="font-size:13px;color:var(--text2);margin-left:6px">/mês</span></div>
+    <div id="invGoalEdit" style="display:none" class="row-gap">
+      <span style="font-size:14px;color:var(--text2)">R$</span>
+      <input type="number" id="invGoalInput" value="${invGoal}" style="width:120px;font-size:14px;padding:5px 10px">
+      <button class="btn-primary" onclick="saveInvGoal()">Salvar</button>
+      <button class="btn" onclick="cancelInvGoal()">Cancelar</button>
+    </div>
+  </div>
+  <div class="section-label">Clique no valor meta para editar</div>`;
+
+  EXPENSE_CATS.forEach(cid=>{
+    const c=cat(cid), spent=s.byCategory[cid]||0, goal=goals[cid]||0, over=spent>goal&&goal>0;
+    html+=`<div class="goal-item">
+      <div class="goal-header">
+        <div class="goal-left">
+          <i class="ti ${c.icon}" style="font-size:16px;color:${c.color}"></i>
+          <span style="font-size:14px;font-weight:500">${c.label}</span>
+          ${over?bdg("Acima da meta","#FCEBEB","#A32D2D"):""}
+        </div>
+        <div class="row-gap">
+          <span style="font-size:13px;color:${over?"#E24B4A":"var(--text2)"}">${fmt(spent)}</span>
+          <div id="goalView_${cid}">
+            <button class="btn-sm" onclick="editGoal('${cid}')">${fmt(goal)}</button>
+          </div>
+          <div id="goalEdit_${cid}" style="display:none" class="row-gap">
+            <input type="number" id="goalInput_${cid}" value="${goal}" style="width:90px">
+            <button class="btn-primary btn-sm" onclick="saveGoal('${cid}')">✓</button>
+            <button class="btn btn-sm" onclick="cancelGoal('${cid}')">✕</button>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:10px">${progBar(spent,goal,c.color)}</div>
+    </div>`;
+  });
+  document.getElementById("goals").innerHTML=html;
+}
+
+function editInvGoal() {
+  document.getElementById("invGoalDisplay").style.display="none";
+  document.getElementById("invGoalEdit").style.display="flex";
+  document.getElementById("invGoalInput").focus();
+}
+function saveInvGoal() {
+  invGoal=parseFloat(document.getElementById("invGoalInput").value)||invGoal;
+  save(); cancelInvGoal(); renderGoals(); renderDashboard();
+}
+function cancelInvGoal() {
+  document.getElementById("invGoalDisplay").style.display="";
+  document.getElementById("invGoalEdit").style.display="none";
+}
+function editGoal(cid) {
+  document.getElementById(`goalView_${cid}`).style.display="none";
+  document.getElementById(`goalEdit_${cid}`).style.display="flex";
+  document.getElementById(`goalInput_${cid}`).focus();
+}
+function saveGoal(cid) {
+  goals[cid]=parseFloat(document.getElementById(`goalInput_${cid}`).value)||goals[cid];
+  save(); renderGoals(); renderDashboard();
+}
+function cancelGoal(cid) {
+  document.getElementById(`goalView_${cid}`).style.display="";
+  document.getElementById(`goalEdit_${cid}`).style.display="none";
+}
+
+// ─── Upload & AI Import ──────────────────────────────────────────────────────
+
+let pendingImport       = []; // transações lidas, aguardando confirmação
+let selectedSource      = null; // fonte selecionada na tela de importação
+let pendingImportFileName = ''; // nome do arquivo sendo importado
+
+function getApiKey() { return localStorage.getItem("fp:apikey") || ""; }
+function saveApiKey(k) { localStorage.setItem("fp:apikey", k); }
+
+function renderUpload() {
+  const hasKey = !!getApiKey();
+  // Build source selector options
+  const srcOptions = sources.map(s =>
+    '<option value="' + s.id + '">' + s.name + ' (' + (s.type==='cartao'?'Cartão':'Conta') + ')</option>'
+  ).join('');
+  const hasSources = sources.length > 0;
+  const srcSelector = hasSources
+    ? '<div style="margin-bottom:20px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-size:13px;font-weight:500">Fonte do arquivo</span><a href="#" onclick="switchTab(\'config\');configSection=\'sources\';renderConfig();return false" style="font-size:12px;color:#3266AD">Gerenciar fontes</a></div><select id="sourceSelect" onchange="selectedSource=sources.find(s=>s.id===this.value)||null;renderUpload()" style="width:100%;font-size:13px;padding:6px 10px;border-radius:8px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)"><option value="">— Selecionar fonte (opcional) —</option>' + srcOptions + '</select></div>'
+    : '<div style="margin-bottom:20px;background:var(--surface2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--text2)">💡 Cadastre <a href="#" onclick="switchTab(\'config\');configSection=\'sources\';renderConfig();return false" style="color:#3266AD">fontes de extrato</a> para aplicar automaticamente a lógica de regime de caixa/competência e identificar cartão adicional.</div>';
+
+  const srcInfo = selectedSource
+    ? '<div style="background:' + (selectedSource.type==='cartao'?'#EFF8FF':'#F0FFF4') + ';border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--text2)">'
+      + '<strong style="color:var(--text)">' + selectedSource.name + '</strong>'
+      + (selectedSource.type==='cartao'
+        ? ' · Cartão · Vencimento dia <strong>' + selectedSource.dueDay + '</strong> · Regime de <strong>caixa</strong> (data da fatura)'
+        : ' · Conta corrente · Regime de <strong>competência</strong> (data original)')
+      + '</div>'
+    : '';
+
+  document.getElementById("upload").innerHTML =
+    srcSelector
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px" class="upload-grid">'
+
+      // Opção 1: CSV / XLS
+      + '<div class="card" style="position:relative">'
+      + '<div style="display:inline-flex;align-items:center;gap:5px;background:#EAF3DE;color:#3B6D11;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:500;margin-bottom:10px"><i class="ti ti-check"></i> Sem custo · Sem API</div>'
+      + '<div style="font-size:14px;font-weight:500;margin-bottom:4px">Planilha / CSV</div>'
+      + '<div style="font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.6">Exporte o extrato pelo app do banco como <strong>CSV ou XLS</strong> e importe aqui. Leitura local, sem envio de dados.</div>'
+      + srcInfo
+      + '<input type="file" id="fileInputCSV" accept=".csv,.xls,.xlsx,.txt,.ofx" style="display:none" onchange="handleUpload(this,\'csv\')">'
+      + '<div class="upload-zone" id="uploadZoneCSV" onclick="document.getElementById(\'fileInputCSV\').click()" style="padding:20px">'
+      + '<i class="ti ti-table" style="font-size:24px;color:var(--text2);display:block;margin-bottom:6px"></i>'
+      + '<div style="font-size:13px;font-weight:500;margin-bottom:2px">CSV · XLS · XLSX · OFX</div>'
+      + '<div style="font-size:11px;color:var(--text2)">Itaú, Bradesco, Santander e outros</div>'
+      + '</div></div>';
+
+    document.getElementById("upload").innerHTML +=
+    '<div class="card" style="position:relative">'
+    + '<div style="display:inline-flex;align-items:center;gap:5px;background:' + (hasKey?"#EAF3DE":"#FFF3E0") + ';color:' + (hasKey?"#3B6D11":"#7a4f0a") + ';border-radius:6px;padding:2px 8px;font-size:11px;font-weight:500;margin-bottom:10px"><i class="ti ' + (hasKey?"ti-check":"ti-key") + '"></i> ' + (hasKey?"API configurada":"Requer chave de API") + '</div>'
+    + '<div style="font-size:14px;font-weight:500;margin-bottom:4px">PDF / Imagem</div>'
+    + '<div style="font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.6">Envie o PDF do extrato ou uma foto da fatura. A IA da Anthropic lê o conteúdo e extrai todas as transações.' + (!hasKey ? '<br><a href="#" onclick="switchTab(\'config\');return false" style="color:#3266AD;font-size:11px">→ Configurar chave de API</a>' : '') + '</div>'
+    + srcInfo
+    + '<input type="file" id="fileInputPDF" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="handleUpload(this,\'pdf\')">'
+    + '<div class="upload-zone" id="uploadZonePDF" onclick="' + (hasKey?"document.getElementById(\'fileInputPDF\').click()":"switchTab(\'config\')") + '" style="padding:20px;' + (!hasKey?"opacity:0.6;cursor:default":"") + '">'
+    + '<i class="ti ti-file-type-pdf" style="font-size:24px;color:var(--text2);display:block;margin-bottom:6px"></i>'
+    + '<div style="font-size:13px;font-weight:500;margin-bottom:2px">PDF · JPG · PNG</div>'
+    + '<div style="font-size:11px;color:var(--text2)">' + (hasKey?"Fatura ou extrato digitalizado":"Configure a API para ativar") + '</div>'
+    + '</div></div></div>';
+
+  document.getElementById("upload").innerHTML += '<div id="uploadProgress" style="display:none" class="progress-log"></div><div id="uploadResult"></div>';
+
+  // Responsive grid
+  const style = document.createElement("style");
+  style.textContent = "@media(max-width:600px){.upload-grid{grid-template-columns:1fr!important}}";
+  if (!document.getElementById("_ugrid_style")) {
+    style.id = "_ugrid_style";
+    document.head.appendChild(style);
+  }
+
+  // Restore source select value if one was selected
+  if (selectedSource) {
+    const sel = document.getElementById("sourceSelect");
+    if (sel) sel.value = selectedSource.id;
+  }
+
+  // Append tips card
+  document.getElementById("upload").innerHTML += buildUploadTipsHTML();
+}
+
+function buildUploadTipsHTML() {
+  return '<div class="card"><div style="font-size:13px;font-weight:500;margin-bottom:12px">Dicas por banco</div>'
+    + '<div class="row-gap mb-8" style="align-items:flex-start"><i class="ti ti-building" style="font-size:14px;color:var(--text2);margin-top:2px;flex-shrink:0"></i><span style="font-size:12px;color:var(--text2);line-height:1.6"><strong>Bradesco:</strong> App → Extrato → Exportar → CSV (conta) | Fatura → Exportar CSV (cartão)</span></div>'
+    + '<div class="row-gap mb-8" style="align-items:flex-start"><i class="ti ti-building" style="font-size:14px;color:var(--text2);margin-top:2px;flex-shrink:0"></i><span style="font-size:12px;color:var(--text2);line-height:1.6"><strong>Itaú:</strong> App → Extrato → Exportar → CSV</span></div>'
+    + '<div class="row-gap mb-8" style="align-items:flex-start"><i class="ti ti-building" style="font-size:14px;color:var(--text2);margin-top:2px;flex-shrink:0"></i><span style="font-size:12px;color:var(--text2);line-height:1.6"><strong>Santander:</strong> App → Extrato → Compartilhar → CSV ou PDF</span></div>'
+    + '<div class="row-gap" style="align-items:flex-start"><i class="ti ti-info-circle" style="font-size:14px;color:var(--text2);margin-top:2px;flex-shrink:0"></i><span style="font-size:12px;color:var(--text2);line-height:1.6">Qualquer formato funciona — o sistema detecta automaticamente</span></div>'
+    + '</div>';
+}
+
+function logStep(msg, status="active") {
+  const log = document.getElementById("uploadProgress");
+  if (!log) return;
+  log.style.display = "block";
+  const icon = status==="done" ? "✓" : status==="error" ? "✗" : "·";
+  log.innerHTML += `<div class="progress-step ${status}">${icon} ${msg}</div>`;
+  log.scrollTop = log.scrollHeight;
+}
+function updateLastStep(msg, status) {
+  const log = document.getElementById("uploadProgress");
+  if (!log) return;
+  const steps = log.querySelectorAll(".progress-step");
+  if (steps.length) {
+    const last = steps[steps.length-1];
+    last.className = `progress-step ${status}`;
+    const icon = status==="done" ? "✓" : status==="error" ? "✗" : "·";
+    last.textContent = icon + " " + msg;
+  }
+}
+
+async function handleUpload(input, mode) {
+  const file = input.files[0]; if (!file) return;
+  input.value = "";
+
+  // Fonte obrigatória
+  if (!selectedSource) {
+    document.getElementById("uploadResult").innerHTML =
+      '<div style="margin-top:14px;background:#FFF0E0;border:0.5px solid #F39C12;border-radius:10px;padding:12px 16px;font-size:13px;color:#7a4f0a">'
+      + '<strong>Selecione uma fonte</strong> antes de importar. A fonte define se é conta corrente ou cartão de crédito e qual regime de data aplicar.'
+      + '</div>';
+    return;
+  }
+
+  pendingImportFileName = file.name;
+  importDateSettings = { mode: 'original', year: new Date().getFullYear(), billingMonth: '', billingYear: '' };
+  document.getElementById("uploadProgress").innerHTML = "";
+  document.getElementById("uploadResult").innerHTML = "";
+  const zone = document.getElementById(mode === "pdf" ? "uploadZonePDF" : "uploadZoneCSV");
+  zone.style.pointerEvents = "none"; zone.style.opacity = "0.5";
+
+  try {
+    let txs = [];
+
+    if (mode === "csv") {
+      // ── CSV / XLS: parse nativo, sem API ───────────────────────────────
+      txs = await parseSpreadsheet(file);
+    } else {
+      // ── PDF / Imagem: IA da Anthropic ──────────────────────────────────
+      const apiKey = getApiKey();
+      if (!apiKey) throw new Error("Chave de API não configurada. Acesse a aba Config.");
+      const ext = file.name.split(".").pop().toLowerCase();
+      logStep("Lendo arquivo...");
+      const b64 = await toBase64(file);
+      updateLastStep("Arquivo carregado ✓", "done");
+      logStep("Enviando para a IA (visão computacional)...");
+      const mediaType = ext === "pdf" ? "application/pdf" : ext === "png" ? "image/png" : "image/jpeg";
+      txs = await extractWithAI({ type: "file", b64, mediaType }, file.name, apiKey);
+      updateLastStep(`IA processou ${txs.length} transações ✓`, "done");
+    }
+
+    logStep("Categorizando automaticamente...", "active");
+
+    // Apply source logic: if source is a card, use billingDate as date (caixa)
+    // originalDate is already set by parseBradescoFatura; for generic parsers, set it here
+    const src = selectedSource;
+    txs = txs.map(function(t) {
+      const detectedCat = t.category || detectCat(t.description, t.amount);
+      const tx = { ...t, id: uid(), category: detectedCat };
+      // Auto-flag Cartão Dani for cartao_dani category
+      if (detectedCat === "cartao_dani") tx.isAdditionalCard = true;
+      if (src) {
+        tx.sourceId = src.id;
+        tx.sourceName = src.name;
+        if (src.type === "cartao") {
+          // Save original date from file for reference
+          if (tx.date && !tx.originalDate) tx.originalDate = tx.date;
+          if (tx.date) tx._rawDate = tx.originalDate || tx.date;
+          // Billing date will be set by applyDateSettings() when user selects month/year
+          // For now, keep date as-is (will be overwritten before confirm)
+        }
+        if (src.additionalName && !tx.isAdditionalCard) {
+          tx.isAdditionalCard = tx.description.toLowerCase().includes(src.additionalName.toLowerCase());
+        }
+      }
+      return tx;
+    });
+
+    updateLastStep("Categorização concluída ✓", "done");
+
+    pendingImport = txs;
+    // For card sources: apply billing date immediately if month/year already set,
+    // otherwise renderImportReview will show the selector and user must pick.
+    renderImportReview(txs, pendingImportFileName);
+
+  } catch (err) {
+    updateLastStep("Erro: " + err.message, "error");
+    document.getElementById("uploadResult").innerHTML =
+      `<div style="margin-top:14px;background:#FCEBEB;border:0.5px solid #E24B4A;border-radius:10px;padding:12px 16px;font-size:13px;color:#7a1a1a">
+        <strong>Erro ao processar arquivo:</strong> ${err.message}
+       </div>`;
+  }
+
+  zone.style.pointerEvents = ""; zone.style.opacity = "";
+}
+
+// ─── CSV / XLS Native Parser ──────────────────────────────────────────────────
+
+async function parseSpreadsheet(file) {
+  logStep("Lendo planilha...");
+  const ext = file.name.split(".").pop().toLowerCase();
+  let rows = [];
+
+  if (["xls","xlsx"].includes(ext)) {
+    if (!window.XLSX) throw new Error("Biblioteca XLSX não carregou. Verifique sua conexão.");
+    const ab = await file.arrayBuffer();
+    const wb = XLSX.read(ab, { type: "array", cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: "yyyy-mm-dd" });
+  } else {
+    // Try windows-1252 first (Bradesco/Itaú), fallback UTF-8
+    const buf = await file.arrayBuffer();
+    let raw = new TextDecoder("windows-1252").decode(buf);
+    if (/\ufffd/.test(raw)) raw = new TextDecoder("utf-8").decode(buf);
+
+    if (ext === "ofx" || raw.includes("<STMTTRN>") || raw.includes("<OFX>")) {
+      return parseOFX(raw);
+    }
+
+    // Split on ANY line ending (CR-only = Bradesco, CRLF = Windows, LF = Unix, \r\r = some Bradesco files)
+    const lines = raw.split(/\r\n|\r\r|\r|\n/).filter(l => l !== undefined);
+    const sep = detectSep(lines);
+    rows = lines.map(l => l.split(sep).map(c => c.replace(/^["'\s]+|["'\s]+$/g, "").trim()));
+  }
+
+  updateLastStep("Planilha lida ✓", "done");
+  logStep("Detectando formato do banco...");
+
+  // Detect which kind of Bradesco file this is
+  // Use the raw joined text for detection (more reliable than parsed rows)
+  const rawFlat = rows.slice(0, 15).map(r => r.join(" ")).join(" ").toLowerCase();
+  const fileType = (rawFlat.includes("situação da fatura") || rawFlat.includes("situacao da fatura") ||
+                    rawFlat.includes("total da fatura") || rawFlat.includes("situação:") ||
+                    rawFlat.includes("pago") && rawFlat.includes("fatura"))
+    ? "fatura_bradesco" : "generic";
+
+  let txs;
+  if (fileType === "fatura_bradesco") {
+    txs = parseBradescoFatura(rows);
+  } else {
+    const mainRows = extractMainBlock(rows);
+    txs = detectBankFormat(mainRows, file.name);
+  }
+
+  if (txs.length === 0) throw new Error("Nenhuma transação encontrada. Verifique se o arquivo é um extrato válido.");
+  updateLastStep(txs.length + " transações detectadas ✓", "done");
+  return txs;
+}
+
+function detectSep(lines) {
+  // Count each separator across first 10 non-empty lines and pick the most frequent.
+  // Checking only the first line fails when it contains no semicolons (e.g. Bradesco
+  // title row "Extrato de: Ag: 3448...") while the data rows use semicolons.
+  const counts = { ";": 0, ",": 0, "\t": 0 };
+  let checked = 0;
+  for (let i = 0; i < lines.length && checked < 10; i++) {
+    const l = lines[i];
+    if (!l || l.trim().length < 3) continue;
+    counts[";"] += (l.match(/;/g) || []).length;
+    counts[","] += (l.match(/,/g) || []).length;
+    counts["\t"] += (l.match(/\t/g) || []).length;
+    checked++;
+  }
+  if (counts[";"] >= counts[","] && counts[";"] >= counts["\t"]) return ";";
+  if (counts["\t"] >= counts[","] && counts["\t"] >= counts[";"]) return "\t";
+  return ",";
+}
+
+// Detects Bradesco fatura CSV (has "Situação da Fatura" or "Total da fatura" header lines)
+function detectBradescoFileType(rows) {
+  const flat = rows.slice(0, 10).map(r => r.join(" ").toLowerCase()).join(" ");
+  if (flat.includes("situação da fatura") || flat.includes("situacao da fatura") || flat.includes("total da fatura")) {
+    return "fatura_bradesco";
+  }
+  return "generic";
+}
+
+// Parser specific for Bradesco credit card CSV
+// Handles: multiple card holders in one file, DD/MM dates without year,
+// \r\r line endings, SALDO/PAG BOLETO rows that must be ignored
+function parseBradescoFatura(rows) {
+  const txs = [];
+  const additionalHolderName = (selectedSource && selectedSource.additionalName
+    ? selectedSource.additionalName.toLowerCase() : "");
+
+  // Build list of holder blocks: { holderName, isAdditional, rows[] }
+  const blocks = [];
+  let currentBlock = null;
+
+  for (let i = 0; i < rows.length; i++) {
+    const row  = rows[i];
+    const raw0 = String(row[0] || "").trim();
+
+    // Skip completely empty rows
+    if (!raw0 && row.every(function(c) { return !String(c||"").trim(); })) continue;
+
+    // Stop at summary section
+    if (/^resumo das despesas|^taxas;|^descri|^cotação/i.test(raw0)) break;
+    if (/^total da fatura em real/i.test(raw0)) break;
+
+    // Holder name line: non-empty first cell, NOT starting with digit or "Data",
+    // and has a 4-digit card suffix somewhere in the row
+    const hasCardSuffix = row.some(function(c) { return /^\d{4}$/.test(String(c||"").trim()); });
+    const isNotDataRow  = !raw0.match(/^\d{2}\//) && raw0.toLowerCase() !== "data";
+    const isNotMetadata = !/situação|situacao|pago|aberto/i.test(raw0);
+
+    if (raw0 && isNotDataRow && isNotMetadata && hasCardSuffix) {
+      // This is a holder line
+      const holderName = raw0.toLowerCase();
+      const isAdditional = additionalHolderName
+        ? holderName.includes(additionalHolderName)
+        : (blocks.length > 0); // if no config: first block = principal, rest = additional
+      currentBlock = { holderName: raw0, isAdditional: isAdditional, dataRows: [] };
+      blocks.push(currentBlock);
+      continue;
+    }
+
+    // Header row: Data;Histórico;...
+    if (raw0.toLowerCase() === "data") {
+      // just marks start of data — currentBlock already set
+      continue;
+    }
+
+    // Data row: must start with DD/MM pattern
+    if (currentBlock && /^\d{2}\/\d{2}$/.test(raw0)) {
+      currentBlock.dataRows.push(row);
+    }
+  }
+
+  // Now process each block
+  blocks.forEach(function(block) {
+    block.dataRows.forEach(function(row) {
+      const rawDate = String(row[0] || "").trim();
+      const dateParsed = parseDateDDMM(rawDate);
+      if (!dateParsed) return;
+
+      const desc = String(row[1] || "").trim().toUpperCase();
+      if (!desc || desc.length < 2) return;
+
+      // Skip balance/payment rows
+      if (/^SALDO|^PAG BOLETO|^PAGAMENTO DA FATURA|^PAGAMENTO FATURA/i.test(desc)) return;
+
+      // BRL amount: prefer last column with a real value, skip US$ column (usually 0)
+      let amount = 0;
+      // Scan from the end: find first non-zero numeric column
+      for (let j = row.length - 1; j >= 2; j--) {
+        const v = parseMoney(String(row[j] || ""));
+        if (v !== 0) { amount = v; break; }
+      }
+      if (!amount) return;
+
+      const isCreditReturn = /estorno|crédito|credito|devolução|devol|reembolso|cashback|^cr /i.test(desc);
+      const finalAmount = isCreditReturn ? Math.abs(amount) : -Math.abs(amount);
+
+      txs.push({
+        date:             dateParsed.billingDate,
+        originalDate:     dateParsed.originalDate,
+        description:      desc,
+        amount:           finalAmount,
+        type:             "expense",
+        isAdditionalCard: block.isAdditional,
+        category:         null,
+      });
+    });
+  });
+
+  return txs;
+}
+
+
+// Parse DD/MM date inferring year from source due day
+// Returns { billingDate: "YYYY-MM-DD", originalDate: "YYYY-MM-DD" }
+function parseDateDDMM(raw, dueDay) {
+  const m = raw.match(/^(\d{2})\/(\d{2})$/);
+  if (!m) return null;
+  const d = parseInt(m[1]), mo = parseInt(m[2]);
+  if (d < 1 || d > 31 || mo < 1 || mo > 12) return null;
+
+  // Infer year: use current year, go back up to 2 years if month seems in the past
+  const now = new Date();
+  let year = now.getFullYear();
+  // If the month is ahead of current month (e.g. reading a Dec fatura in Jan), subtract a year
+  if (mo > now.getMonth() + 1) year--;
+
+  const originalDate = year + "-" + String(mo).padStart(2,"0") + "-" + String(d).padStart(2,"0");
+
+  // Billing date: due date of the fatura
+  let billingDate = originalDate;
+  if (dueDay && selectedSource?.type === "cartao") {
+    // The billing date = the due day of the month AFTER the transaction month
+    let billMo = mo + 1, billYear = year;
+    if (billMo > 12) { billMo = 1; billYear++; }
+    billingDate = billYear + "-" + String(billMo).padStart(2,"0") + "-" + String(dueDay).padStart(2,"0");
+  }
+
+  return { originalDate, billingDate };
+}
+
+function extractMainBlock(rows) {
+  const dateKws   = ["data","date","dt"];
+  const amountKws = ["valor","débito","debito","crédito","credito","amount"];
+
+  // Pre-process: expand rows where first cell has embedded \r\n (Bradesco CR-only quirk)
+  const expanded = [];
+  rows.forEach(function(row) {
+    const first = String(row[0] || "");
+    if (/[\r\n]/.test(first)) {
+      first.split(/[\r\n]/).forEach(function(part, i) {
+        if (i === 0) expanded.push([part].concat(row.slice(1)));
+        else expanded.push(part.split(";").map(c => c.replace(/^["'\s]+|["'\s]+$/g,"").trim()));
+      });
+    } else {
+      expanded.push(row);
+    }
+  });
+  rows = expanded;
+
+  let mainStart = -1, mainEnd = rows.length;
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i].map(c => String(c||"").toLowerCase().trim());
+    if (r.some(c => dateKws.some(k => c === k || c.startsWith(k + " "))) &&
+        r.some(c => amountKws.some(k => c.includes(k)))) {
+      mainStart = i; break;
+    }
+  }
+  if (mainStart < 0) return rows;
+
+  for (let i = mainStart + 2; i < rows.length; i++) {
+    const r = rows[i].map(c => String(c||"").toLowerCase().trim());
+    const isBlank  = r.every(c => !c);
+    const isTotal  = r.some(c => c === "total" || c.startsWith("total"));
+    const isNewHdr = r.some(c => dateKws.some(k => c === k)) &&
+                     r.some(c => amountKws.some(k => c.includes(k)));
+    if (isBlank || isTotal || isNewHdr) { mainEnd = i; break; }
+  }
+
+  // Merge continuation lines (Bradesco appends detail on next row with empty date)
+  const block = [];
+  for (let i = mainStart; i < mainEnd; i++) {
+    const row = rows[i];
+    const firstCell = String(row[0]||"").trim();
+    if (!firstCell && block.length > 0) {
+      const detail = row.filter(c => String(c||"").trim()).join(" ").trim();
+      if (detail) {
+        const prev = block[block.length - 1];
+        if (prev[1] !== undefined) prev[1] = (prev[1] + " - " + detail).slice(0, 120);
+      }
+    } else {
+      block.push([...row]);
+    }
+  }
+  return block;
+}
+
+
+function parseOFX(raw) {
+  logStep("Parseando formato OFX...");
+  const txs = [];
+  const blocks = raw.split(/<\/?STMTTRN>/i).filter((_,i) => i % 2 === 1);
+  blocks.forEach(block => {
+    const get = tag => { const m = block.match(new RegExp(`<${tag}>([^<\n\r]+)`, "i")); return m ? m[1].trim() : ""; };
+    const dtRaw = get("DTPOSTED") || get("DTUSER");
+    const amtRaw = get("TRNAMT");
+    const desc = get("MEMO") || get("NAME") || get("FITID");
+    if (!dtRaw || !amtRaw) return;
+    const y = dtRaw.slice(0,4), mo = dtRaw.slice(4,6), d = dtRaw.slice(6,8);
+    const date = `${y}-${mo}-${d}`;
+    const amount = parseFloat(amtRaw.replace(",",".")) || 0;
+    txs.push({ date, description: desc.toUpperCase(), amount, type: amount >= 0 ? "income" : "expense", isAdditionalCard: false, category: null });
+  });
+  updateLastStep(`${txs.length} transações OFX ✓`, "done");
+  return txs;
+}
+
+function detectBankFormat(rows, filename) {
+  // Remove empty rows
+  rows = rows.filter(r => r.some(c => c && String(c).trim()));
+
+  // Find header row (contains date/valor keywords)
+  const dateKws   = ["data","date","dt","lançamento","lancamento"];
+  const amountKws = ["valor","value","amount","débito","credito","crédito","debito","montante"];
+  const descKws   = ["histórico","historico","descrição","descricao","memo","description","estabelecimento","lançamento","lancamento","compra","favorecido","nome"];
+
+  let headerIdx = -1, colDate = -1, colDesc = -1, colAmount = -1, colDebit = -1, colCredit = -1;
+
+  for (let i = 0; i < Math.min(rows.length, 20); i++) {
+    const row = rows[i].map(c => String(c||"").toLowerCase().trim());
+    const hasDate   = row.some(c => dateKws.some(k => c.includes(k)));
+    const hasAmount = row.some(c => amountKws.some(k => c.includes(k)));
+    if (hasDate && (hasAmount || row.length >= 3)) {
+      headerIdx = i;
+      row.forEach((c, j) => {
+        if (colDate   < 0 && dateKws.some(k => c.includes(k)))   colDate   = j;
+        if (colDesc   < 0 && descKws.some(k => c.includes(k)))   colDesc   = j;
+        if (colAmount < 0 && (c.includes("valor") || c.includes("amount") || c.includes("montante")) && !c.includes("saldo")) colAmount = j;
+        if (colDebit  < 0 && (c.includes("débit") || c.includes("debit") || c.includes("débito"))) colDebit = j;
+        if (colCredit < 0 && (c.includes("crédit") || c.includes("credit") || c.includes("crédito"))) colCredit = j;
+      });
+      break;
+    }
+  }
+
+  // Fallback: try heuristic column detection on first data row
+  if (headerIdx < 0) {
+    for (let i = 0; i < Math.min(rows.length, 10); i++) {
+      const row = rows[i];
+      const dateCol = row.findIndex(c => /^\d{2}[\/\-\.]\d{2}[\/\-\.]\d{2,4}$/.test(String(c||"").trim()));
+      if (dateCol >= 0) { headerIdx = i - 1; colDate = dateCol; break; }
+    }
+  }
+
+  if (headerIdx < 0) throw new Error("Não foi possível detectar o cabeçalho. Tente um arquivo CSV com cabeçalho.");
+
+  const dataRows = rows.slice(headerIdx + 1);
+  const txs = [];
+
+  // Detect if this is a credit card invoice (all monetary values positive)
+  // Heuristic: sample first 20 data rows and check if ALL non-zero amounts are positive
+  const sampleAmounts = dataRows.slice(0, 20)
+    .map(r => {
+      if (colDebit >= 0 || colCredit >= 0) return null;
+      return colAmount >= 0 ? parseMoney(r[colAmount]) : null;
+    })
+    .filter(v => v !== null && v !== 0);
+  const isCreditCardFile = sampleAmounts.length > 2 && sampleAmounts.every(v => v > 0);
+
+  for (const row of dataRows) {
+    if (!row || row.length < 2) continue;
+
+    // Parse date
+    const rawDate = String(row[colDate >= 0 ? colDate : 0] || "").trim();
+    const date = parseDate(rawDate);
+    if (!date) continue;
+    // Skip rows whose description looks like a summary/balance line
+    const rawDesc0 = String(row[colDesc >= 0 ? colDesc : 1] || "").trim().toUpperCase();
+    if (/^SALDO |^TOTAL$|^SALDO ANTERIOR|SALDO INVEST|SALDOS INVEST/i.test(rawDesc0)) continue;
+
+    // Parse description
+    let desc = "";
+    if (colDesc >= 0) {
+      desc = String(row[colDesc] || "").trim();
+    } else {
+      // Use longest non-date, non-number column
+      desc = row.map(c => String(c||"").trim())
+                .filter(c => c && !/^[\d\.,\-\+R$\s]+$/.test(c) && !parseDate(c))
+                .sort((a,b) => b.length - a.length)[0] || "";
+    }
+    if (!desc || desc.length < 2) continue;
+
+    // Parse amount
+    let amount = 0;
+    if (colDebit >= 0 || colCredit >= 0) {
+      // Separate debit/credit columns
+      // Note: some banks (e.g. Bradesco) store debits with a minus sign already in the
+      // debit column cell ("-114,29"). Use Math.abs() to normalise before subtracting.
+      const deb = Math.abs(parseMoney(row[colDebit] || ""));
+      const cre = Math.abs(parseMoney(row[colCredit] || ""));
+      amount = cre - deb;  // positive = credit/income, negative = debit/expense
+    } else if (colAmount >= 0) {
+      amount = parseMoney(row[colAmount] || "");
+    } else {
+      // Find first numeric-looking column that isn't the date column
+      const numCols = row.map((c,i) => ({i, v: parseMoney(c)}))
+                        .filter(({i, v}) => i !== colDate && v !== 0 && !isNaN(v));
+      if (numCols.length > 0) amount = numCols[0].v;
+    }
+    if (amount === 0 && desc) amount = 0; // allow zero? no — skip
+    if (amount === 0) continue;
+
+    // Detect additional card
+    const isAdditionalCard = /adicional|dependente|conjuge|cônjuge|cartão adicional/i.test(desc);
+
+    // Credit card invoice logic:
+    // If file appears to be a credit card (all amounts positive, no negatives yet),
+    // treat all values as expenses EXCEPT payments/refunds/reversals
+    const isCreditReturn = /pagamento|estorno|crédito|credito|devolução|devolucao|reembolso|cashback|ajuste a crédito/i.test(desc);
+    // Re-sign: if value came as positive but context is expense, flip to negative
+    let finalAmount = amount;
+    if (isCreditCardFile && amount > 0 && !isCreditReturn) finalAmount = -amount;
+    if (isCreditReturn && amount > 0) finalAmount = amount; // keep positive (income/refund)
+
+    txs.push({
+      date,
+      description: desc.toUpperCase().slice(0, 120),
+      amount: finalAmount,
+      type: finalAmount >= 0 ? "income" : "expense",
+      isAdditionalCard,
+      category: null,
+    });
+  }
+
+  return txs;
+}
+
+function parseDate(raw) {
+  if (!raw) return null;
+  raw = String(raw).trim().replace(/\s+/g, " ");
+
+  // ISO: 2025-05-01 or 2025/05/01
+  let m = raw.match(/^(\d{4})[\-\/\.](\d{2})[\-\/\.](\d{2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2,"0")}-${m[3].padStart(2,"0")}`;
+
+  // BR: 01/05/2025 or 01-05-2025 or 01.05.2025
+  m = raw.match(/^(\d{2})[\-\/\.](\d{2})[\-\/\.](\d{4})/);
+  if (m) return `${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
+
+  // Short year: 01/05/25
+  m = raw.match(/^(\d{2})[\-\/\.](\d{2})[\-\/\.](\d{2})$/);
+  if (m) { const y = +m[3] > 50 ? "19"+m[3] : "20"+m[3]; return `${y}-${m[2]}-${m[1]}`; }
+
+  // Excel serial date number
+  const n = parseFloat(raw);
+  if (!isNaN(n) && n > 40000 && n < 60000) {
+    const d = new Date(Math.round((n - 25569) * 86400 * 1000));
+    if (!isNaN(d)) return d.toISOString().slice(0,10);
+  }
+
+  return null;
+}
+
+function parseMoney(raw) {
+  if (raw === null || raw === undefined) return 0;
+  let s = String(raw).trim().replace(/\s/g,"");
+  if (!s || s === "-" || s === "") return 0;
+  // Remove currency symbols
+  s = s.replace(/[R$€£¥\u00A0]/g,"").trim();
+  // Determine decimal separator: if last separator has 2 decimals → decimal
+  const hasDot   = s.includes(".");
+  const hasComma = s.includes(",");
+  if (hasDot && hasComma) {
+    // Both present: last one is decimal
+    const lastDot   = s.lastIndexOf(".");
+    const lastComma = s.lastIndexOf(",");
+    if (lastDot > lastComma) s = s.replace(/,/g,"");           // 1.234,56 → 1234.56 nope, 1,234.56
+    else s = s.replace(/\./g,"").replace(",",".");              // 1.234,56
+  } else if (hasComma && !hasDot) {
+    // Check if comma is decimal or thousands
+    const parts = s.split(",");
+    if (parts.length === 2 && parts[1].length <= 2) s = s.replace(",",".");
+    else s = s.replace(/,/g,"");
+  }
+  const v = parseFloat(s);
+  return isNaN(v) ? 0 : v;
+}
+
+function toBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(",")[1]);
+    r.onerror = () => rej(new Error("Falha ao ler arquivo"));
+    r.readAsDataURL(file);
+  });
+}
+
+async function extractWithAI(source, filename, apiKey) {
+  const catList = CATEGORIES.map(c => `${c.id}: ${c.label}`).join(", ");
+  // Determine billing date info for AI prompt
+  const _src = selectedSource;
+  const _cardInfo = _src && _src.type === 'cartao'
+    ? 'Este eh cartao de credito vencimento dia ' + _src.dueDay + '. Para cada compra use como date o dia ' + String(_src.dueDay).padStart(2,'0') + ' do mes seguinte (compra 15/03 -> date 2026-04-' + String(_src.dueDay).padStart(2,'0') + '). Salve data original da compra em originalDate.'
+    : 'Use a data exata de cada lancamento conforme aparece no extrato.';
+
+  const prompt = "Voce e um extrator de dados financeiros. Analise este documento e extraia TODAS as transacoes individuais.\n\n"
+    + "Retorne APENAS um array JSON valido, sem texto adicional, sem markdown, sem blocos de codigo.\n\n"
+    + "Cada item deve ter:\n"
+    + "- date: string YYYY-MM-DD\n"
+    + "- originalDate: string YYYY-MM-DD ou null (data original da compra se diferente de date)\n"
+    + "- description: string (descricao original em MAIUSCULAS sem truncar)\n"
+    + "- amount: number (negativo para debitos/gastos/compras, positivo para creditos/recebimentos/estornos)\n"
+    + "- type: expense ou income\n"
+    + "- category: uma das opcoes: " + catList + " — ou null\n"
+    + "- isAdditionalCard: boolean true se for de titular adicional/dependente/conjuge\n\n"
+    + "Instrucoes de data: " + _cardInfo + "\n\n"
+    + "Regras criticas:\n"
+    + "- Datas DD/MM sem ano: infira o ano pelo contexto do documento (periodo da fatura, cabecalho)\n"
+    + "- PAGAMENTO DA FATURA, PAGAMENTO FATURA-INTERNET: NAO incluir\n"
+    + "- SALDO ANTERIOR, totais, resumos: NAO incluir\n"
+    + "- Estornos e creditos: amount POSITIVO\n"
+    + "- Compras parceladas: inclua a parcela desta fatura como UMA transacao\n"
+    + "- IOF, encargos, juros, multa: incluir como transacoes negativas\n"
+    + "- Extrato conta corrente: PIX enviado = negativo, PIX recebido = positivo\n"
+    + "- Transferencias entre contas proprias: category transferencia\n"
+    + "- Pro-labore, salario, dividendos: category receita\n"
+    + "- Anuidade cartao: incluir como transacao negativa\n\n"
+    + "Nome do arquivo: " + filename;
+
+  let body;
+  if (source.type === "text") {
+    body = {
+      model: "claude-sonnet-4-6",
+      max_tokens: 4000,
+      messages: [{ role: "user", content: prompt + "\n\nConteudo do arquivo:\n\n" + source.content.slice(0, 50000) }]
+    };
+  } else {
+    const contentParts = [{ type: "text", text: prompt }];
+    if (source.mediaType === "application/pdf") {
+      contentParts.unshift({ type: "document", source: { type: "base64", media_type: "application/pdf", data: source.b64 } });
+    } else {
+      contentParts.unshift({ type: "image", source: { type: "base64", media_type: source.mediaType, data: source.b64 } });
+    }
+    body = {
+      model: "claude-sonnet-4-6",
+      max_tokens: 4000,
+      messages: [{ role: "user", content: contentParts }]
+    };
+  }
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `Erro HTTP ${res.status}`);
+  }
+
+  const data = await res.json();
+  const text = data.content?.find(b => b.type === "text")?.text || "";
+
+  // Parse JSON — strip any accidental markdown fences
+  const clean = text.replace(/```json|```/g, "").trim();
+  let parsed;
+  try { parsed = JSON.parse(clean); }
+  catch(e) {
+    // Try to find JSON array inside the response
+    const match = clean.match(/\[[\s\S]*\]/);
+    if (match) parsed = JSON.parse(match[0]);
+    else throw new Error("A IA não retornou JSON válido. Tente novamente.");
+  }
+
+  if (!Array.isArray(parsed)) throw new Error("Formato inesperado retornado pela IA.");
+  return parsed;
+}
+
+// ─── Date settings for import review ─────────────────────────────────────────
+
+// Stores the user-confirmed date settings for the current import
+let importDateSettings = { mode: 'original', year: new Date().getFullYear(), billingMonth: '', billingYear: '' };
+
+function buildDateSettingsBar(txs) {
+  const src = selectedSource;
+  const now  = new Date();
+  const thisYear = now.getFullYear();
+  const years  = [thisYear, thisYear-1, thisYear-2].map(y =>
+    '<option value="' + y + '" ' + (importDateSettings.year === y ? 'selected' : '') + '>' + y + '</option>'
+  ).join('');
+
+  // Detect if file has dates without year (DD/MM pattern)
+  const hasYearlessDates = txs.some(t => !t.date || t.date.length < 7);
+
+  if (!src) {
+    return '<span style="color:var(--text2)">⚠ Nenhuma fonte selecionada</span>';
+  }
+
+  if (src.type === 'conta') {
+    // CC extrato: use original date, but if year is missing let user pick
+    if (hasYearlessDates) {
+      return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+        + '<span style="font-weight:500">📅 Conta corrente — Ano das transações:</span>'
+        + '<select id="importYear" onchange="importDateSettings.year=+this.value;applyDateSettings()" style="font-size:12px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">' + years + '</select>'
+        + '<span style="color:var(--text2)">Data original do arquivo será usada (dia e mês)</span>'
+        + '</div>';
+    }
+    return '📅 <strong>Conta corrente</strong> — regime de competência: usando a data exata de cada lançamento';
+  }
+
+  if (src.type === 'cartao') {
+    // Card: user must pick month/year of the billing period
+    const months = [
+      'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+      'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
+    ].map((m,i) => {
+      const v = String(i+1).padStart(2,'0');
+      return '<option value="' + v + '" ' + (importDateSettings.billingMonth === v ? 'selected' : '') + '>' + m + '</option>';
+    }).join('');
+
+    const billYears = [thisYear, thisYear-1, thisYear+1].map(y =>
+      '<option value="' + y + '" ' + (importDateSettings.billingYear == y ? 'selected' : '') + '>' + y + '</option>'
+    ).join('');
+
+    return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+      + '<span style="font-weight:500">💳 Cartão — Esta fatura é de:</span>'
+      + '<select id="importBillingMonth" onchange="importDateSettings.billingMonth=this.value;applyDateSettings()" style="font-size:12px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">'
+      + '<option value="">— mês —</option>' + months + '</select>'
+      + '<select id="importBillingYear" onchange="importDateSettings.billingYear=+this.value;applyDateSettings()" style="font-size:12px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">'
+      + '<option value="">— ano —</option>' + billYears + '</select>'
+      + '<span style="color:var(--text2);font-size:11px">Vencimento dia ' + src.dueDay + ' — data original da compra salva em campo separado</span>'
+      + '</div>'
+      + (!importDateSettings.billingMonth ? '<div style="margin-top:6px;color:#E67E22;font-size:11px">⚠ Selecione o mês e ano desta fatura antes de confirmar</div>' : '');
+  }
+
+  return '';
+}
+
+function applyDateSettings() {
+  const src = selectedSource;
+  if (!src) return;
+
+  pendingImport = pendingImport.map(function(t) {
+    if (src.type === 'conta') {
+      // Fix year for yearless dates (various patterns)
+      if (!t.date) return t;
+      const dateStr = t.date;
+      if (dateStr.length < 7) {
+        // Pure "MM-DD" or "DD-MM" without year
+        t.date = importDateSettings.year + '-' + dateStr;
+      } else if (dateStr.startsWith('1970') || dateStr.startsWith('0000')) {
+        // Bad year placeholder from parser
+        t.date = String(importDateSettings.year) + dateStr.slice(4);
+      }
+      // If date looks valid (YYYY-MM-DD), leave as-is
+    } else if (src.type === 'cartao') {
+      // ALWAYS use the billing date for card sources.
+      // Save the file date as originalDate before overwriting.
+      if (!t.originalDate && t._rawDate) t.originalDate = t._rawDate;
+      if (!t.originalDate && t.date)     t.originalDate = t.date;
+
+      // Apply billing date only if user has selected month/year
+      if (importDateSettings.billingMonth && importDateSettings.billingYear) {
+        const dueDay = String(src.dueDay || 10).padStart(2, '0');
+        t.date = importDateSettings.billingYear + '-' + importDateSettings.billingMonth + '-' + dueDay;
+      }
+      // If no billing month yet, leave t.date as-is — user will see the selector
+      // and applyDateSettings will be called again once they pick
+    }
+    return t;
+  });
+
+  // Re-render the review table with updated dates
+  renderImportReview(pendingImport, pendingImportFileName);
+}
+
+function renderImportReview(txs, filename) {
+  if (txs.length === 0) {
+    document.getElementById("uploadResult").innerHTML =
+      `<div style="margin-top:14px;background:#FFF8F0;border:0.5px solid #F39C12;border-radius:10px;padding:12px 16px;font-size:13px;color:#7a4f0a">
+        Nenhuma transação encontrada no arquivo. Verifique se é um extrato válido.
+       </div>`;
+    return;
+  }
+
+  const dupCount = txs.filter(t => isDuplicate(t)).length;
+  const uncat = txs.filter(t => !t.category).length;
+
+  // Group by month for display
+  const months = [...new Set(txs.map(t => t.date.slice(0,7)))].sort();
+
+  let rows = txs.map((t,i) => {
+    const c = CATEGORIES.find(c => c.id === t.category);
+    const isDup = isDuplicate(t);
+    const catOptions = catOptionsHTML(t.category, false);
+    return `<tr style="${isDup ? "opacity:0.45" : ""}">
+      <td><input type="checkbox" class="import-chk" data-idx="${i}" ${isDup?"":"checked"}></td>
+      <td style="white-space:nowrap">
+        <div style="font-size:13px;color:var(--text)">${t.date || '—'}</div>
+        ${(t.originalDate || t._rawDate) && (t.originalDate || t._rawDate) !== t.date
+          ? `<div style="font-size:10px;color:var(--text3);margin-top:1px" title="Data original do arquivo">${t.originalDate || t._rawDate}</div>`
+          : ""}
+      </td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${t.description}">${t.description}</td>
+      <td style="text-align:right;font-weight:500;color:${t.amount>0?"#27AE60":"#E24B4A"};white-space:nowrap">${t.amount>0?"+":""}${fmt(t.amount)}</td>
+      <td>
+        <select class="cat-select" data-idx="${i}" onchange="pendingImport[${i}].category=this.value">
+          <option value="">— não classificado —</option>
+          ${catOptions}
+        </select>
+      </td>
+      <td>
+        <select class="cat-select" onchange="pendingImport[${i}].projectId=this.value||undefined" style="font-size:11px">
+          <option value="">—</option>
+          ${projects.filter(function(p){return !p.archived;}).map(function(p){return '<option value="'+p.id+'">'+p.name+'</option>';}).join("")}
+        </select>
+      </td>
+      <td>
+        <input type="text" maxlength="50" placeholder="Obs..." value="${t.notes||''}"
+          onchange="pendingImport[${i}].notes=this.value.trim()"
+          style="width:100px;font-size:11px;padding:2px 6px;border-radius:5px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
+      </td>
+      <td style="text-align:center">
+        <label style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:3px;cursor:pointer;white-space:nowrap">
+          <input type="checkbox" ${t.isAdditionalCard?"checked":""}
+            onchange="pendingImport[${i}].isAdditionalCard=this.checked"> Dani
+        </label>
+      </td>
+      <td>${isDup ? `<span class="bdg" style="background:#FFF3E0;color:#E65100">duplicata?</span>` : ""}</td>
+    </tr>`;
+  }).join("");
+
+  document.getElementById("uploadResult").innerHTML = `
+    <div class="import-confirm">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:14px;font-weight:500;color:#1a3a2a;margin-bottom:4px">✓ ${txs.length} transações identificadas em ${months.map(m => {const[y,mo]=m.split("-");return new Date(+y,+mo-1,1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"});}).join(", ")}</div>
+          <div style="font-size:12px;color:#3B6D11">
+            ${uncat>0 ? `${uncat} sem categoria · ` : ""}
+            ${dupCount>0 ? `${dupCount} possível(is) duplicata(s) desmarcada(s) · ` : ""}
+            Revise e confirme a importação abaixo
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn" onclick="cancelImport()">Cancelar</button>
+          <button class="btn-primary" onclick="confirmImport()" style="padding:6px 16px">Confirmar importação</button>
+        </div>
+      </div>
+      <div id="dateSettingsBar" style="background:var(--surface2);border-radius:8px;padding:12px 14px;margin-top:12px;font-size:12px">
+        ${buildDateSettingsBar(txs)}
+      </div>
+      <div class="review-table" style="overflow-x:auto;margin-top:14px">
+        <table class="review-table">
+          <thead><tr>
+            <th style="width:32px"><input type="checkbox" id="chkAll" checked onchange="toggleAllChk(this)"></th>
+            <th>Data<div style="font-size:10px;font-weight:400;color:var(--text3)">Original</div></th><th>Descrição</th><th style="text-align:right">Valor</th><th>Categoria</th><th>Projeto</th><th>Observação</th><th>Dani</th><th></th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function isDuplicate(t) {
+  return transactions.some(ex =>
+    ex.date === t.date &&
+    Math.abs(ex.amount - t.amount) < 0.01 &&
+    ex.description.slice(0,20) === (t.description||"").slice(0,20)
+  );
+}
+
+function toggleAllChk(master) {
+  document.querySelectorAll(".import-chk").forEach(c => c.checked = master.checked);
+}
+
+function cancelImport() {
+  pendingImport = [];
+  document.getElementById("uploadResult").innerHTML = "";
+  document.getElementById("uploadProgress").innerHTML = "";
+  document.getElementById("uploadProgress").style.display = "none";
+}
+
+function confirmImport() {
+  // For card sources, require billing month/year to be selected
+  if (selectedSource && selectedSource.type === 'cartao' && !importDateSettings.billingMonth) {
+    alert("Selecione o mês e ano desta fatura antes de confirmar.");
+    return;
+  }
+
+  const checked = [...document.querySelectorAll(".import-chk:checked")].map(c => +c.dataset.idx);
+  const importId = "imp_" + Date.now().toString(36);
+  const importedAt = new Date().toLocaleString("pt-BR");
+  const toAdd = checked.map(i => pendingImport[i]).filter(Boolean).map(t => ({
+    ...t,
+    id: t.id || uid(),
+    importId,
+    type: t.type || (t.amount > 0 ? "income" : "expense"),
+    isAdditionalCard: t.isAdditionalCard || false,
+  }));
+
+  if (toAdd.length === 0) { alert("Nenhuma transação selecionada."); return; }
+
+  transactions = [...transactions, ...toAdd];
+
+  // Save import log
+  const months = [...new Set(toAdd.map(t => t.date.slice(0,7)))].sort();
+  const importLog = JSON.parse(localStorage.getItem("fp:importLog") || "[]");
+  const importFileName = pendingImportFileName || '';
+  importLog.unshift({ id: importId, at: importedAt, count: toAdd.length, months, fileName: importFileName, sourceName: selectedSource?.name || '' });
+  localStorage.setItem("fp:importLog", JSON.stringify(importLog.slice(0, 50)));
+
+  save();
+  pendingImport = [];
+
+  if (months.length) filterMonth = months[0];
+  updateMonthSelect();
+  updateUnclassifiedBadge();
+
+  document.getElementById("uploadProgress").innerHTML = "";
+  document.getElementById("uploadProgress").style.display = "none";
+  document.getElementById("uploadResult").innerHTML =
+    `<div class="upload-success" style="margin-top:14px">
+      <div style="font-size:13px;font-weight:500;color:#3B6D11;margin-bottom:4px">✓ ${toAdd.length} transações importadas com sucesso</div>
+      <div style="font-size:12px;color:#3B6D11">Meses: ${months.map(m=>{const[y,mo]=m.split("-");return new Date(+y,+mo-1,1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"});}).join(", ")} · <a href="#" onclick="switchTab('config');configSection='imports';renderConfig();return false" style="color:#1a3a2a;font-weight:500">Gerenciar importações →</a></div>
+    </div>`;
+
+  if (activeTab === "dashboard") renderDashboard();
+}
+
+
+// ─── Sources (fontes de extrato) ─────────────────────────────────────────────
+
+function buildSourcesSectionHTML() {
+  let rows = "";
+  sources.forEach(function(s) {
+    const typeLabel  = s.type === "cartao" ? "Cartão de crédito" : "Conta corrente";
+    const typeColor  = s.type === "cartao" ? "#3266AD" : "#2E9E6E";
+    const dueInfo    = s.type === "cartao" ? ' · Vencimento dia <strong>' + s.dueDay + '</strong>' : '';
+    const holderInfo = '';
+    rows += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:0.5px solid var(--border);gap:8px;flex-wrap:wrap">'
+          + '<div>'
+          + '<div style="font-size:13px;font-weight:500">' + s.name + '</div>'
+          + '<div style="font-size:12px;color:var(--text2);margin-top:2px">'
+          + '<span style="color:' + typeColor + ';font-weight:500">' + typeLabel + '</span>'
+          + dueInfo
+          + '</div></div>'
+          + '<button onclick="deleteSource(\'' + s.id + '\')" class="btn-sm" style="font-size:11px;border-color:#E24B4A;color:#E24B4A">Remover</button>'
+          + '</div>';
+  });
+
+  const emptyMsg = sources.length === 0
+    ? '<div style="font-size:13px;color:var(--text2);padding:12px 0">Nenhuma fonte cadastrada ainda.</div>'
+    : '';
+
+  return '<div class="card mb-16">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
+    + '<div><div style="font-size:14px;font-weight:500">Fontes de extrato</div>'
+    + '<div style="font-size:12px;color:var(--text2);margin-top:2px">Cadastre suas contas e cartões para importação inteligente</div></div>'
+    + '<button class="btn-primary" onclick="toggleNewSourceForm()" style="font-size:12px;padding:6px 14px">+ Nova fonte</button>'
+    + '</div>'
+    + '<div id="newSourceForm" style="display:none;background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:14px">'
+    + buildNewSourceFormHTML()
+    + '</div>'
+    + emptyMsg + rows
+    + '</div>'
+    + '<div class="card" style="background:var(--surface2)">'
+    + '<div style="font-size:12px;color:var(--text2);margin-bottom:6px;font-weight:500">Como funciona</div>'
+    + '<div style="font-size:12px;color:var(--text2);line-height:1.7">'
+    + '• <strong>Conta corrente:</strong> regime de competência — usa a data original de cada lançamento<br>'
+    + '• <strong>Cartão de crédito:</strong> regime de caixa — usa a data de vencimento da fatura; a data original fica salva como histórico em cada transação<br>'
+    + '• Transações do cartão adicional são detectadas automaticamente pelo nome do titular na fatura'
+    + '</div></div>';
+}
+
+function buildNewSourceFormHTML() {
+  return '<div style="font-size:13px;font-weight:500;margin-bottom:12px">Nova fonte</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
+    + '<div><div style="font-size:12px;color:var(--text2);margin-bottom:4px">Nome</div>'
+    + '<input type="text" id="srcName" placeholder="Ex: Mastercard Itaú" style="width:100%;font-size:13px;padding:6px 10px;border-radius:7px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)"></div>'
+    + '<div><div style="font-size:12px;color:var(--text2);margin-bottom:4px">Tipo</div>'
+    + '<select id="srcType" onchange="toggleSourceTypeFields()" style="width:100%;font-size:13px;padding:6px 10px;border-radius:7px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">'
+    + '<option value="conta">Conta corrente</option><option value="cartao">Cartão de crédito</option></select></div>'
+    + '</div>'
+    + '<div id="cartaoFields" style="display:none;grid-template-columns:1fr;gap:10px;margin-bottom:10px">'
+    + '<div><div style="font-size:12px;color:var(--text2);margin-bottom:4px">Dia de vencimento</div>'
+    + '<input type="number" id="srcDueDay" min="1" max="31" placeholder="Ex: 10" style="width:200px;font-size:13px;padding:6px 10px;border-radius:7px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)"></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px">'
+    + '<button class="btn-primary" onclick="saveNewSource()" style="font-size:12px">Salvar fonte</button>'
+    + '<button class="btn" onclick="toggleNewSourceForm()" style="font-size:12px">Cancelar</button>'
+    + '</div>';
+}
+
+function toggleNewSourceForm() {
+  const f = document.getElementById("newSourceForm");
+  if (f) f.style.display = f.style.display === "none" ? "block" : "none";
+}
+
+function toggleSourceTypeFields() {
+  const t = document.getElementById("srcType")?.value;
+  const cf = document.getElementById("cartaoFields");
+  if (cf) cf.style.display = t === "cartao" ? "grid" : "none";
+}
+
+function saveNewSource() {
+  const name = (document.getElementById("srcName")?.value || "").trim();
+  const type = document.getElementById("srcType")?.value || "conta";
+  if (!name) { alert("Digite um nome para a fonte."); return; }
+  const src = { id: "src_" + Date.now().toString(36), name, type };
+  if (type === "cartao") {
+    src.dueDay = parseInt(document.getElementById("srcDueDay")?.value) || 10;
+  }
+  sources.push(src);
+  save();
+  renderConfig();
+  renderUpload();
+}
+
+function deleteSource(id) {
+  if (!confirm("Remover esta fonte?")) return;
+  sources = sources.filter(s => s.id !== id);
+  if (selectedSource && selectedSource.id === id) selectedSource = null;
+  save();
+  renderConfig();
+  renderUpload();
+}
+
+// ─── Config render helpers (avoids nested template literals) ─────────────────
+
+function buildCatSectionHTML(expCats, sysCats) {
+  let rows = "";
+  expCats.forEach(function(c) {
+    rows += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border)">'
+          + '<span style="width:10px;height:10px;border-radius:50%;background:' + c.color + ';flex-shrink:0"></span>'
+          + '<i class="ti ' + c.icon + '" style="font-size:16px;color:' + c.color + ';width:18px;flex-shrink:0"></i>'
+          + '<span style="flex:1;font-size:13px">' + c.label + '</span>'
+          + '<button onclick="openEditCat(\'' + c.id + '\')" class="btn-sm" style="font-size:11px">Editar</button>'
+          + '</div>';
+  });
+  let sysCatRows = "";
+  sysCats.forEach(function(c) {
+    sysCatRows += '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px;color:var(--text2)">'
+               + '<span style="width:8px;height:8px;border-radius:50%;background:' + c.color + '"></span>' + c.label
+               + '</div>';
+  });
+  return '<div class="card mb-16">'
+       + '<div style="font-size:14px;font-weight:500;margin-bottom:4px">Categorias de gasto</div>'
+       + '<div style="font-size:12px;color:var(--text2);margin-bottom:16px">Renomeie ou crie novas categorias. As categorias do sistema não podem ser removidas.</div>'
+       + '<div id="catList">' + rows + '</div>'
+       + '<div style="margin-top:14px"><button class="btn-primary" onclick="openNewCat()" style="font-size:12px;padding:6px 14px">+ Nova categoria</button></div>'
+       + '</div>'
+       + '<div class="card" style="background:var(--surface2)">'
+       + '<div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:8px">Categorias do sistema (não editáveis)</div>'
+       + sysCatRows
+       + '</div>'
+       + '<div id="catEditor" style="display:none"></div>';
+}
+
+function buildKwSectionHTML(expCats, custom) {
+  let inputs = "";
+  expCats.forEach(function(c) {
+    const customKws = (custom[c.id] || []).join(", ");
+    inputs += '<div style="margin-bottom:14px">'
+            + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'
+            + '<span style="width:8px;height:8px;border-radius:50%;background:' + c.color + '"></span>'
+            + '<span style="font-size:13px;font-weight:500">' + c.label + '</span>'
+            + '</div>'
+            + '<input type="text" id="kw_' + c.id + '" value="' + customKws + '"'
+            + ' placeholder="Ex: meu restaurante favorito, padaria xyz"'
+            + ' style="width:100%;font-size:12px;padding:6px 10px;border-radius:7px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">'
+            + '</div>';
+  });
+  return '<div class="card mb-16">'
+       + '<div style="font-size:14px;font-weight:500;margin-bottom:4px">Palavras-chave por categoria</div>'
+       + '<div style="font-size:12px;color:var(--text2);margin-bottom:16px">Adicione termos dos seus extratos para melhorar a categorização automática. Suas adições somam às palavras padrão.</div>'
+       + inputs
+       + '<button class="btn-primary" onclick="saveKeywords()" style="margin-top:4px">Salvar palavras-chave</button>'
+       + '</div>';
+}
+
+function buildImportLogHTML(importLog) {
+  let rows = "";
+  importLog.forEach(function(imp) {
+    const monthLabels = imp.months.map(function(m) {
+      const parts = m.split("-");
+      return new Date(+parts[0], +parts[1]-1, 1).toLocaleDateString("pt-BR", {month:"long",year:"numeric"});
+    }).join(", ");
+    const stillExists = transactions.some(function(t) { return t.importId === imp.id; });
+    rows += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:0.5px solid var(--border);gap:12px;flex-wrap:wrap">'
+          + '<div>'
+          + '<div style="font-size:13px;font-weight:500">' + imp.count + ' transações · ' + monthLabels + '</div>'
+          + '<div style="font-size:12px;color:var(--text2);margin-top:2px">'
+          + (imp.fileName ? '<span style="font-family:monospace;background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:11px">' + imp.fileName + '</span> · ' : '')
+          + (imp.sourceName ? imp.sourceName + ' · ' : '')
+          + '<span style="color:var(--text3);font-size:11px">ID: ' + imp.id + '</span>'
+          + '</div>'
+          + '<div style="font-size:11px;color:var(--text3);margin-top:1px">Importado em ' + imp.at + '</div>'
+          + '</div>'
+          + (stillExists
+              ? '<div style="display:flex;gap:6px">'
+                + '<button onclick="invertImport(\'' + imp.id + '\')" class="btn" style="font-size:12px;white-space:nowrap" title="Inverte todos os sinais (débito↔crédito) desta importação">⇄ Inverter sinais</button>'
+                + '<button onclick="undoImport(\'' + imp.id + '\')" class="btn" style="font-size:12px;border-color:#E24B4A;color:#E24B4A;white-space:nowrap">Desfazer</button>'
+                + '</div>'
+              : '<span style="font-size:11px;color:var(--text3)">já removido</span>')
+          + '</div>';
+  });
+  return rows;
+}
+
+function buildImportsSectionHTML(importLog) {
+  let rows = importLog.length === 0
+    ? '<div style="font-size:13px;color:var(--text2);padding:16px 0">Nenhuma importação registrada ainda.</div>'
+    : buildImportLogHTML(importLog);
+
+  return '<div class="card mb-16">'
+       + '<div style="font-size:14px;font-weight:500;margin-bottom:4px">Histórico de importações</div>'
+       + '<div style="font-size:12px;color:var(--text2);margin-bottom:16px">Desfaça importações realizadas por engano. Apenas as transações daquela importação serão removidas.</div>'
+       + rows
+       + '</div>'
+       + '<div class="card" style="border-color:var(--border)">'
+       + '<div style="font-size:14px;font-weight:500;margin-bottom:8px">Zerar todas as importações</div>'
+       + '<div style="font-size:12px;color:var(--text2);margin-bottom:12px">Remove todas as transações importadas de uma vez. Metas e configurações são mantidas.</div>'
+       + '<button class="btn" style="border-color:#E24B4A;color:#E24B4A" onclick="clearAllImports()">Zerar todas as importações</button>'
+       + '</div>';
+}
+
+
+// ─── Backup & Restore ────────────────────────────────────────────────────────
+
+function buildBackupSectionHTML() {
+  return '<div class="card mb-16">'
+    + '<div style="font-size:15px;font-weight:500;margin-bottom:4px">Backup de configurações</div>'
+    + '<div style="font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.7">'
+    + 'Exporta fontes, categorias, palavras-chave, metas e projetos em um arquivo JSON.<br>'
+    + '<strong>A chave de API não é incluída</strong> por segurança — você deve reconfigurá-la manualmente se trocar de computador.'
+    + '</div>'
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">'
+    + '<button class="btn-primary" onclick="exportConfig()" style="font-size:13px"><i class="ti ti-download" style="font-size:14px"></i> Exportar configurações</button>'
+    + '<button class="btn" onclick="document.getElementById(\'restoreConfigInput\').click()" style="font-size:13px"><i class="ti ti-upload" style="font-size:14px"></i> Restaurar configurações</button>'
+    + '<input type="file" id="restoreConfigInput" accept=".json" style="display:none" onchange="restoreConfig(this)">'
+    + '</div>'
+
+    + '<div style="font-size:15px;font-weight:500;margin-bottom:4px">Backup de transações</div>'
+    + '<div style="font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.7">'
+    + 'Exporta todas as transações importadas em JSON. Use para transferir dados entre computadores ou como cópia de segurança.'
+    + '</div>'
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
+    + '<button class="btn-primary" onclick="exportTransactions()" style="font-size:13px"><i class="ti ti-download" style="font-size:14px"></i> Exportar transações</button>'
+    + '<button class="btn" onclick="document.getElementById(\'restoreTxInput\').click()" style="font-size:13px"><i class="ti ti-upload" style="font-size:14px"></i> Restaurar transações</button>'
+    + '<input type="file" id="restoreTxInput" accept=".json" style="display:none" onchange="restoreTransactions(this)">'
+    + '</div>'
+    + '<div id="backupMsg" style="margin-top:12px"></div>'
+    + '</div>'
+
+    + '<div class="card" style="background:var(--surface2)">'
+    + '<div style="font-size:12px;font-weight:500;margin-bottom:8px;color:var(--text2)">Como manter as configurações entre versões do programa</div>'
+    + '<div style="font-size:12px;color:var(--text2);line-height:1.8">'
+    + '1. Antes de substituir o arquivo HTML, clique em <strong>Exportar configurações</strong><br>'
+    + '2. Abra a nova versão do programa<br>'
+    + '3. Vá em Config → Backup → <strong>Restaurar configurações</strong> e selecione o arquivo salvo<br>'
+    + '4. Reconfigure a chave de API (única coisa não salva no backup)<br>'
+    + '5. Para as transações, faça o mesmo com <strong>Exportar/Restaurar transações</strong>'
+    + '</div></div>';
+}
+
+function downloadJSON(data, filename) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function exportConfig() {
+  const ts = new Date().toISOString().slice(0,10);
+  downloadJSON({
+    _version: 2,
+    _type: 'moneymap_config',
+    _exportedAt: new Date().toISOString(),
+    sources,
+    goals,
+    invGoal,
+    projects,
+    customCats:   JSON.parse(localStorage.getItem('fp:customCats')  || '[]'),
+    catLabels:    JSON.parse(localStorage.getItem('fp:catLabels')   || '{}'),
+    keywords:     JSON.parse(localStorage.getItem('fp:keywords')    || '{}'),
+  }, 'moneymap-config-' + ts + '.json');
+  showBackupMsg('✓ Configurações exportadas com sucesso!', '#3B6D11', '#EAF3DE');
+}
+
+function exportTransactions() {
+  const ts = new Date().toISOString().slice(0,10);
+  const importLog = JSON.parse(localStorage.getItem('fp:importLog') || '[]');
+  downloadJSON({
+    _version: 2,
+    _type: 'moneymap_transactions',
+    _exportedAt: new Date().toISOString(),
+    transactions,
+    importLog,
+  }, 'moneymap-transacoes-' + ts + '.json');
+  showBackupMsg('✓ ' + transactions.length + ' transações exportadas com sucesso!', '#3B6D11', '#EAF3DE');
+}
+
+function restoreConfig(input) {
+  const file = input.files[0]; if (!file) return;
+  input.value = '';
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data._type !== 'moneymap_config') throw new Error('Arquivo inválido. Selecione um backup de configurações.');
+
+      if (data.sources)    { sources = data.sources; localStorage.setItem('fp:sources', JSON.stringify(sources)); }
+      if (data.goals)      { goals   = data.goals;   localStorage.setItem('fp:goals',   JSON.stringify(goals));   }
+      if (data.invGoal !== undefined) { invGoal = data.invGoal; localStorage.setItem('fp:inv', JSON.stringify(invGoal)); }
+      if (data.projects)   { projects = data.projects; localStorage.setItem('fp:projects', JSON.stringify(projects)); }
+      if (data.customCats) localStorage.setItem('fp:customCats', JSON.stringify(data.customCats));
+      if (data.catLabels)  localStorage.setItem('fp:catLabels',  JSON.stringify(data.catLabels));
+      if (data.keywords)   { localStorage.setItem('fp:keywords', JSON.stringify(data.keywords)); KEYWORD_MAP = loadKeywordMap(); }
+
+      // Reload custom categories into CATEGORIES array
+      loadCustomCategories();
+
+      showBackupMsg('✓ Configurações restauradas! Fontes: ' + (data.sources||[]).length + ', Projetos: ' + (data.projects||[]).length, '#3B6D11', '#EAF3DE');
+      renderConfig();
+      renderUpload();
+    } catch(err) {
+      showBackupMsg('✗ Erro: ' + err.message, '#A32D2D', '#FCEBEB');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function restoreTransactions(input) {
+  const file = input.files[0]; if (!file) return;
+  input.value = '';
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data._type !== 'moneymap_transactions') throw new Error('Arquivo inválido. Selecione um backup de transações.');
+
+      if (!Array.isArray(data.transactions)) throw new Error('Formato de transações inválido.');
+
+      const action = transactions.length > 0
+        ? confirm('Já existem ' + transactions.length + ' transações salvas.\n\nClique OK para MESCLAR (adicionar às existentes)\nClique Cancelar para SUBSTITUIR todas.')
+        : true;
+
+      if (action) {
+        // Merge: add only those not already present by id
+        const existingIds = new Set(transactions.map(t => t.id));
+        const newTxs = data.transactions.filter(t => !existingIds.has(t.id));
+        transactions = [...transactions, ...newTxs];
+        showBackupMsg('✓ ' + newTxs.length + ' transações adicionadas (' + (data.transactions.length - newTxs.length) + ' duplicadas ignoradas)', '#3B6D11', '#EAF3DE');
+      } else {
+        transactions = data.transactions;
+        showBackupMsg('✓ ' + transactions.length + ' transações restauradas (dados anteriores substituídos)', '#3B6D11', '#EAF3DE');
+      }
+
+      if (data.importLog) localStorage.setItem('fp:importLog', JSON.stringify(data.importLog));
+      save();
+      const n = new Date();
+      filterMonth = n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0');
+      updateMonthSelect();
+      updateUnclassifiedBadge();
+      renderDashboard();
+    } catch(err) {
+      showBackupMsg('✗ Erro: ' + err.message, '#A32D2D', '#FCEBEB');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function showBackupMsg(msg, color, bg) {
+  const el = document.getElementById('backupMsg');
+  if (el) {
+    el.innerHTML = '<div style="font-size:13px;font-weight:500;padding:10px 14px;border-radius:8px;background:' + bg + ';color:' + color + '">' + msg + '</div>';
+    setTimeout(function() { if(el) el.innerHTML = ''; }, 5000);
+  }
+}
+
+// ─── Config ───────────────────────────────────────────────────────────────────
+
+let configSection = "api"; // "api" | "sources" | "categories" | "keywords" | "imports" | "backup"
+
+function renderConfig() {
+  const key = getApiKey();
+  const masked = key ? key.slice(0,8) + "••••••••••••••••" + key.slice(-4) : "";
+
+  // ── Section tabs ────────────────────────────────────────────────────────────
+  const secBtn = (id, label) =>
+    `<button onclick="configSection='${id}';renderConfig()" style="font-size:13px;padding:6px 14px;border-radius:8px;border:${configSection===id?"none":"0.5px solid var(--border)"};background:${configSection===id?"#1a3a2a":"var(--surface2)"};color:${configSection===id?"#fff":"var(--text)"};cursor:pointer;font-weight:${configSection===id?500:400}">${label}</button>`;
+
+  let html = `<div style="display:flex;gap:8px;margin-bottom:20px">
+    ${secBtn("api","Chave de API")}
+    ${secBtn("sources","Fontes")}
+    ${secBtn("categories","Categorias")}
+    ${secBtn("keywords","Palavras-chave")}
+    ${secBtn("imports","Importações")}
+    ${secBtn("backup","Backup")}
+  </div>`;
+
+  // ── API Key ──────────────────────────────────────────────────────────────────
+  if (configSection === "api") {
+    const keyStatus = key
+      ? '<span style="color:#27AE60">\u2713 Chave configurada</span>'
+      : '<span style="color:#E24B4A">Nenhuma chave configurada</span>';
+    const maskedDiv = key
+      ? '<div style="font-size:12px;color:var(--text2);font-family:monospace;margin-bottom:12px">' + masked + '</div>'
+      : '';
+    const removeBtn = key ? '<button class="btn" onclick="clearApiKey()">Remover</button>' : '';
+    html += '<div class="card mb-20">'
+          + '<div style="font-size:15px;font-weight:500;margin-bottom:6px">Chave de API Anthropic</div>'
+          + '<div style="font-size:13px;color:var(--text2);margin-bottom:16px">Necessária para importar PDF e imagens. Salva apenas localmente neste navegador.</div>'
+          + '<div style="font-size:13px;margin-bottom:8px;font-weight:500">' + keyStatus + '</div>'
+          + maskedDiv
+          + '<div class="apikey-row">'
+          + '<input class="apikey-input" type="password" id="apikeyInput" placeholder="sk-ant-api03-..." autocomplete="off">'
+          + '<button class="btn-primary" onclick="saveApiKeyFromInput()">Salvar</button>'
+          + removeBtn
+          + '</div>'
+          + '<div style="font-size:12px;color:var(--text2);margin-top:10px">'
+          + 'Obtenha sua chave em <a href="https://console.anthropic.com/settings/api-keys" target="_blank" style="color:#3266AD">console.anthropic.com/settings/api-keys</a>'
+          + '</div>'
+          + '</div>'
+          + '<div class="card">'
+          + '<div style="font-size:14px;font-weight:500;margin-bottom:8px">Zona de perigo</div>'
+          + '<div style="font-size:12px;color:var(--text2);margin-bottom:12px">Para desfazer importações ou zerar os dados, acesse a aba <strong>Importações</strong>.</div>'
+          + '<button class="btn" style="font-size:12px" onclick="configSection=\'imports\';renderConfig()">Ir para Importações \u2192</button>'
+          + '</div>';
+  }
+
+  // ── Categories ───────────────────────────────────────────────────────────────
+  if (configSection === "categories") {
+    const expCats = [...CATEGORIES].filter(c => !["receita","aporte_empresa","retorno_aporte"].includes(c.id)).sort((a,b)=>a.label.localeCompare(b.label,'pt-BR'));
+    const sysCats = CATEGORIES.filter(c =>  ["receita","aporte_empresa","retorno_aporte"].includes(c.id));
+    const COLORS = ["#E8622A","#3266AD","#2E9E6E","#9B59B6","#E67E22","#1ABC9C","#E91E63","#607D8B","#0891B2","#F39C12","#27AE60","#8E44AD","#95A5A6","#D35400","#16A085","#2980B9"];
+    const ICONS  = ["ti-tools-kitchen-2","ti-car","ti-heart-rate-monitor","ti-mood-smile","ti-home","ti-book","ti-shirt","ti-tool","ti-plane","ti-building-bank","ti-cash","ti-dots","ti-shopping-cart","ti-paw","ti-device-gamepad","ti-music","ti-dumbbell","ti-beach","ti-baby-carriage","ti-gift"];
+
+    html += buildCatSectionHTML(expCats, sysCats);
+  }
+
+  if (configSection === "sources") {
+    html += buildSourcesSectionHTML();
+  }
+
+  if (configSection === "keywords") {
+    const expCats2 = [...CATEGORIES].filter(c => !["receita","aporte_empresa","retorno_aporte"].includes(c.id)).sort((a,b)=>a.label.localeCompare(b.label,'pt-BR'));
+    const saved2 = localStorage.getItem("fp:keywords");
+    const custom2 = saved2 ? JSON.parse(saved2) : {};
+    html += buildKwSectionHTML(expCats2, custom2);
+  }
+  // ── Imports history ──────────────────────────────────────────────────────────
+  if (configSection === "imports") {
+    const importLog = JSON.parse(localStorage.getItem("fp:importLog") || "[]");
+    html += buildImportsSectionHTML(importLog);
+  }
+  if (configSection === "backup") {
+    html += buildBackupSectionHTML();
+  }
+
+  document.getElementById("config").innerHTML = html;
+}
+
+function invertImport(importId) {
+  const count = transactions.filter(t => t.importId === importId).length;
+  if (!confirm("Inverter sinais de " + count + " transações desta importação?\n\nTodos os débitos virarão créditos e vice-versa.")) return;
+  transactions = transactions.map(function(t) {
+    if (t.importId !== importId) return t;
+    const newAmount = -t.amount;
+    return { ...t, amount: newAmount, type: newAmount >= 0 ? "income" : "expense" };
+  });
+  save();
+  updateMonthSelect();
+  renderActiveTab();
+  renderConfig();
+  showBackupMsg("✓ Sinais invertidos em " + count + " transações.", "#3B6D11", "#EAF3DE");
+}
+
+function undoImport(importId) {
+  const imp = JSON.parse(localStorage.getItem("fp:importLog") || "[]").find(i => i.id === importId);
+  const count = transactions.filter(t => t.importId === importId).length;
+  if (!confirm("Remover " + count + " transações desta importação?")) return;
+  transactions = transactions.filter(t => t.importId !== importId);
+  save();
+  updateMonthSelect();
+  updateUnclassifiedBadge();
+  renderConfig();
+  renderDashboard();
+}
+
+function clearAllImports() {
+  const total = transactions.length;
+  if (total === 0) { alert("Não há transações para remover."); return; }
+  if (!confirm("Remover TODAS as " + total + " transações? Esta ação não pode ser desfeita.")) return;
+  transactions = [];
+  localStorage.removeItem("fp:importLog");
+  save();
+  const n = new Date();
+  filterMonth = n.getFullYear() + "-" + String(n.getMonth()+1).padStart(2,"0");
+  updateMonthSelect();
+  updateUnclassifiedBadge();
+  renderConfig();
+  renderDashboard();
+}
+
+function openNewCat() {
+  const COLORS = ["#E8622A","#3266AD","#2E9E6E","#9B59B6","#E67E22","#1ABC9C","#E91E63","#607D8B","#0891B2","#F39C12","#27AE60","#8E44AD"];
+  const ICONS  = ["ti-tools-kitchen-2","ti-car","ti-heart-rate-monitor","ti-mood-smile","ti-home","ti-book","ti-shirt","ti-tool","ti-plane","ti-building-bank","ti-cash","ti-dots","ti-shopping-cart","ti-paw","ti-device-gamepad","ti-music","ti-dumbbell","ti-gift"];
+  const ed = document.getElementById("catEditor");
+  ed.style.display = "block";
+
+  let colorSwatches = COLORS.map(function(c, i) {
+    return '<span onclick="document.querySelectorAll(\'.color-opt\').forEach(function(x){x.style.outline=\'none\'});this.style.outline=\'2px solid var(--text)\';document.getElementById(\'newCatColor\').value=\'' + c + '\'" class="color-opt" style="width:22px;height:22px;border-radius:50%;background:' + c + ';cursor:pointer;' + (i===0?'outline:2px solid var(--text)':'') + '"></span>';
+  }).join('');
+
+  let iconBtns = ICONS.map(function(ic, i) {
+    return '<span onclick="document.querySelectorAll(\'.icon-opt\').forEach(function(x){x.style.background=\'transparent\'});this.style.background=\'var(--surface2)\';document.getElementById(\'newCatIcon\').value=\'' + ic + '\'" class="icon-opt" style="width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:' + (i===0?'var(--surface2)':'transparent') + '"><i class="ti ' + ic + '" style="font-size:16px;color:var(--text2)"></i></span>';
+  }).join('');
+
+  ed.innerHTML = '<div class="card mt-16">'
+    + '<div style="font-size:14px;font-weight:500;margin-bottom:12px">Nova categoria</div>'
+    + '<div style="margin-bottom:10px"><div style="font-size:12px;color:var(--text2);margin-bottom:4px">Nome</div>'
+    + '<input type="text" id="newCatLabel" placeholder="Ex: Pet Shop" style="width:200px;font-size:13px;padding:5px 10px;border-radius:7px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)"></div>'
+    + '<div style="margin-bottom:10px"><div style="font-size:12px;color:var(--text2);margin-bottom:6px">Cor</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap">' + colorSwatches + '</div>'
+    + '<input type="hidden" id="newCatColor" value="' + COLORS[0] + '"></div>'
+    + '<div style="margin-bottom:14px"><div style="font-size:12px;color:var(--text2);margin-bottom:6px">Ícone</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap">' + iconBtns + '</div>'
+    + '<input type="hidden" id="newCatIcon" value="' + ICONS[0] + '"></div>'
+    + '<div style="display:flex;gap:8px">'
+    + '<button class="btn-primary" onclick="saveNewCat()">Criar categoria</button>'
+    + '<button class="btn" onclick="document.getElementById(\'catEditor\').style.display=\'none\'">Cancelar</button>'
+    + '</div></div>';
+}
+
+function openEditCat(id) {
+  const c = CATEGORIES.find(function(x) { return x.id === id; });
+  if (!c) return;
+  const ed = document.getElementById("catEditor");
+  ed.style.display = "block";
+  ed.innerHTML = '<div class="card mt-16">'
+    + '<div style="font-size:14px;font-weight:500;margin-bottom:12px">Editar: ' + c.label + '</div>'
+    + '<div style="margin-bottom:12px"><div style="font-size:12px;color:var(--text2);margin-bottom:4px">Nome</div>'
+    + '<input type="text" id="editCatLabel" value="' + c.label + '" style="width:200px;font-size:13px;padding:5px 10px;border-radius:7px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)"></div>'
+    + '<div style="display:flex;gap:8px">'
+    + '<button class="btn-primary" onclick="saveEditCat(\'' + id + '\')">Salvar</button>'
+    + '<button class="btn" onclick="document.getElementById(\'catEditor\').style.display=\'none\'">Cancelar</button>'
+    + '</div></div>';
+  ed.scrollIntoView({behavior:"smooth"});
+}
+
+
+function saveNewCat() {
+  const label = document.getElementById("newCatLabel").value.trim();
+  if (!label) { alert("Digite um nome para a categoria."); return; }
+  const color = document.getElementById("newCatColor").value;
+  const icon  = document.getElementById("newCatIcon").value;
+  const id    = label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"_").slice(0,20) + "_" + Date.now().toString(36);
+  CATEGORIES.splice(CATEGORIES.length - 3, 0, { id, label, icon, color });
+  // Add to EXPENSE_CATS before "outros"
+  const outIdx = EXPENSE_CATS.indexOf("outros");
+  if (outIdx >= 0) EXPENSE_CATS.splice(outIdx, 0, id);
+  else EXPENSE_CATS.push(id);
+  // Add empty keyword slot
+  if (!DEFAULT_KEYWORD_MAP[id]) DEFAULT_KEYWORD_MAP[id] = [];
+  KEYWORD_MAP = loadKeywordMap();
+  // Persist custom categories
+  saveCustomCategories();
+  renderConfig();
+  alert("Categoria \"" + label + "\" criada! Adicione palavras-chave na aba Palavras-chave.");
+}
+
+function saveEditCat(id) {
+  const label = document.getElementById("editCatLabel").value.trim();
+  if (!label) return;
+  const c = CATEGORIES.find(x => x.id === id);
+  if (c) c.label = label;
+  saveCustomCategories();
+  renderConfig();
+}
+
+function saveCustomCategories() {
+  const custom = CATEGORIES.filter(c => !["supermercado","transporte","saude","lazer","viagem","moradia","educacao","custo_fin_focus","custo_fin_pessoal","despesas_focus","pessoais_saulo","aporte_empresa","retorno_aporte","receita","outros"].includes(c.id));
+  localStorage.setItem("fp:customCats", JSON.stringify(custom));
+  // Also persist label overrides for built-in cats
+  const overrides = {};
+  CATEGORIES.forEach(c => { overrides[c.id] = c.label; });
+  localStorage.setItem("fp:catLabels", JSON.stringify(overrides));
+}
+
+function loadCustomCategories() {
+  // Load label overrides
+  const overrides = JSON.parse(localStorage.getItem("fp:catLabels") || "{}");
+  CATEGORIES.forEach(c => { if (overrides[c.id]) c.label = overrides[c.id]; });
+  // Load custom cats
+  const custom = JSON.parse(localStorage.getItem("fp:customCats") || "[]");
+  custom.forEach(c => {
+    if (!CATEGORIES.find(x => x.id === c.id)) {
+      // Insert before "aporte_empresa" (3 system cats from end)
+      CATEGORIES.splice(CATEGORIES.length - 4, 0, c);
+      const outIdx = EXPENSE_CATS.indexOf("outros");
+      if (outIdx >= 0) EXPENSE_CATS.splice(outIdx, 0, c.id);
+      else EXPENSE_CATS.push(c.id);
+      if (!DEFAULT_KEYWORD_MAP[c.id]) DEFAULT_KEYWORD_MAP[c.id] = [];
+    }
+  });
+  KEYWORD_MAP = loadKeywordMap();
+}
+
+function saveKeywords() {
+  const expCats = [...CATEGORIES].filter(c => !["receita","aporte_empresa","retorno_aporte"].includes(c.id)).sort((a,b)=>a.label.localeCompare(b.label,'pt-BR'));
+  const custom = {};
+  expCats.forEach(c => {
+    const raw = (document.getElementById("kw_" + c.id)?.value || "").trim();
+    if (raw) custom[c.id] = raw.split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+  });
+  localStorage.setItem("fp:keywords", JSON.stringify(custom));
+  KEYWORD_MAP = loadKeywordMap();
+  alert("Palavras-chave salvas! Serão aplicadas na próxima importação.");
+}
+
+function saveApiKeyFromInput() {
+  const v = document.getElementById("apikeyInput").value.trim();
+  if (!v) { alert("Digite uma chave válida."); return; }
+  saveApiKey(v);
+  renderConfig();
+  renderUpload();
+}
+function clearApiKey() {
+  if (!confirm("Remover a chave de API?")) return;
+  localStorage.removeItem("fp:apikey");
+  renderConfig(); renderUpload();
+}
+// clearAllData moved to clearAllImports in imports section
+
+// ─── Projetos ─────────────────────────────────────────────────────────────────
+
+function renderProjetos() {
+  const active   = projects.filter(p => !p.archived);
+  const archived = projects.filter(p =>  p.archived);
+
+  let html = '<div class="card mb-20">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
+    + '<div><div style="font-size:15px;font-weight:500">Projetos</div>'
+    + '<div style="font-size:12px;color:var(--text2);margin-top:2px">Categorias temporárias para rastrear gastos de eventos ou reformas</div></div>'
+    + '<button class="btn-primary" onclick="openNewProject()" style="font-size:12px;padding:6px 14px">+ Novo projeto</button>'
+    + '</div>'
+    + '<div id="newProjectForm" style="display:none;background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:16px">'
+    + '<div style="font-size:13px;font-weight:500;margin-bottom:10px">Novo projeto</div>'
+    + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+    + '<input type="text" id="newProjectName" placeholder="Ex: Nascimento da Serena" style="flex:1;min-width:180px;font-size:13px;padding:6px 10px;border-radius:7px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">'
+    + '<input type="color" id="newProjectColor" value="#9B59B6" style="width:36px;height:32px;border-radius:6px;border:0.5px solid var(--border2);cursor:pointer;padding:2px">'
+    + '<button class="btn-primary" onclick="saveNewProject()" style="font-size:12px">Criar</button>'
+    + '<button class="btn" onclick="document.getElementById(\'newProjectForm\').style.display=\'none\'" style="font-size:12px">Cancelar</button>'
+    + '</div></div>';
+
+  if (active.length === 0 && archived.length === 0) {
+    html += '<div style="font-size:13px;color:var(--text2);padding:16px 0;text-align:center">Nenhum projeto criado ainda. Crie um para rastrear gastos por evento ou reforma.</div>';
+  }
+
+  active.forEach(function(p) {
+    const txs = transactions.filter(function(t) { return t.projectId === p.id; });
+    const total = Math.abs(txs.reduce(function(s,t) { return s + t.amount; }, 0));
+    const months = [...new Set(txs.map(function(t) { return t.date.slice(0,7); }))].sort();
+    html += buildProjectCard(p, txs, total, months, false);
+  });
+
+  if (archived.length > 0) {
+    html += '<div style="font-size:12px;font-weight:500;color:var(--text2);margin-top:20px;margin-bottom:10px">Projetos arquivados</div>';
+    archived.forEach(function(p) {
+      const txs = transactions.filter(function(t) { return t.projectId === p.id; });
+      const total = Math.abs(txs.reduce(function(s,t) { return s + t.amount; }, 0));
+      const months = [...new Set(txs.map(function(t) { return t.date.slice(0,7); }))].sort();
+      html += buildProjectCard(p, txs, total, months, true);
+    });
+  }
+
+  html += '</div>';
+  document.getElementById("projetos").innerHTML = html;
+}
+
+function buildProjectCard(p, txs, total, months, isArchived) {
+  const monthLabel = months.length > 0
+    ? months.map(function(m) { const pts=m.split("-"); return new Date(+pts[0],+pts[1]-1,1).toLocaleDateString("pt-BR",{month:"short",year:"2-digit"}); }).join(", ")
+    : "Sem transações";
+  const opacity = isArchived ? "opacity:0.6;" : "";
+  return '<div style="' + opacity + 'border:0.5px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'
+    + '<div style="display:flex;align-items:center;gap:10px">'
+    + '<span style="width:12px;height:12px;border-radius:50%;background:' + p.color + ';flex-shrink:0"></span>'
+    + '<div>'
+    + '<div style="font-size:14px;font-weight:500">' + p.name + (isArchived ? ' <span style="font-size:10px;background:var(--surface2);color:var(--text2);border-radius:4px;padding:1px 5px">arquivado</span>' : '') + '</div>'
+    + '<div style="font-size:12px;color:var(--text2);margin-top:2px">' + txs.length + ' transações · ' + monthLabel + '</div>'
+    + '</div></div>'
+    + '<div style="display:flex;align-items:center;gap:12px">'
+    + '<span style="font-size:16px;font-weight:600;color:' + p.color + '">' + fmt(total) + '</span>'
+    + (!isArchived
+      ? '<button onclick="archiveProject(\'' + p.id + '\')" class="btn-sm" style="font-size:11px" title="Arquivar">📦 Arquivar</button>'
+      : '<button onclick="unarchiveProject(\'' + p.id + '\')" class="btn-sm" style="font-size:11px">Reativar</button>')
+    + '</div></div>'
+    + (txs.length > 0 ? buildProjectTxList(txs, p) : '')
+    + '</div>';
+}
+
+function buildProjectTxList(txs, p) {
+  const recent = [...txs].sort(function(a,b) { return b.date.localeCompare(a.date); }).slice(0,5);
+  let rows = recent.map(function(t) {
+    return '<tr>'
+      + '<td style="font-size:11px;color:var(--text2);padding:4px 8px;white-space:nowrap">' + fmtDate(t.date) + '</td>'
+      + '<td style="font-size:12px;padding:4px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">' + t.description + '</td>'
+      + '<td style="font-size:12px;font-weight:500;text-align:right;padding:4px 8px;color:' + (t.amount>0?"#27AE60":"#E24B4A") + '">' + (t.amount>0?"+":"") + fmt(t.amount) + '</td>'
+      + '</tr>';
+  }).join("");
+  return '<div style="margin-top:10px;background:var(--surface2);border-radius:7px;overflow:hidden">'
+    + '<table style="width:100%;border-collapse:collapse"><tbody>' + rows + '</tbody></table>'
+    + (txs.length > 5 ? '<div style="font-size:11px;color:var(--text2);padding:5px 8px;text-align:center">+ ' + (txs.length-5) + ' mais transações</div>' : '')
+    + '</div>';
+}
+
+function openNewProject() {
+  document.getElementById("newProjectForm").style.display = "block";
+  document.getElementById("newProjectName").focus();
+}
+
+function saveNewProject() {
+  const name = (document.getElementById("newProjectName")?.value || "").trim();
+  if (!name) { alert("Digite um nome para o projeto."); return; }
+  const color = document.getElementById("newProjectColor")?.value || "#9B59B6";
+  const id = "proj_" + Date.now().toString(36);
+  projects.push({ id, name, color, archived: false, createdAt: new Date().toISOString() });
+  save();
+  renderProjetos();
+}
+
+function archiveProject(id) {
+  const p = projects.find(function(x) { return x.id === id; });
+  if (p) { p.archived = true; save(); renderProjetos(); }
+}
+
+function unarchiveProject(id) {
+  const p = projects.find(function(x) { return x.id === id; });
+  if (p) { p.archived = false; save(); renderProjetos(); }
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+document.querySelectorAll(".nav-btn").forEach(btn=>{
+  btn.addEventListener("click",()=>switchTab(btn.dataset.tab));
+});
+document.getElementById("monthSelect").addEventListener("change",function(){
+  filterMonth=this.value;
+  editingTx=null; editGoalId=null;
+  txFilters={date:"",description:"",category:"",source:"",amount:"",notes:"",dani:""};
+  renderActiveTab();
+});
+
+// Migrate old categories on first load
+(function migrateCats() {
+  // Migrate transaction categories
+  const stored = localStorage.getItem('fp:tx');
+  if (stored) {
+    try {
+      let txs = JSON.parse(stored);
+      let changed = false;
+      txs = txs.map(t => {
+        if (t.category === 'roupas')   { t.category = 'pessoais_saulo'; changed = true; }
+        if (t.category === 'servicos') { t.category = 'outros';         changed = true; }
+        // Auto-flag Cartão Dani for all cartao_dani category transactions
+        if (t.category === 'cartao_dani' && !t.isAdditionalCard) {
+          t.isAdditionalCard = true; changed = true;
+        }
+        return t;
+      });
+      if (changed) localStorage.setItem('fp:tx', JSON.stringify(txs));
+    } catch(e) {}
+  }
+  // Clear stale catLabel overrides for built-in categories
+  // (prevents old saved labels from overriding renamed built-ins)
+  const catLabelsStored = localStorage.getItem('fp:catLabels');
+  if (catLabelsStored) {
+    try {
+      const labelsObj = JSON.parse(catLabelsStored);
+      // Remove overrides whose stored value matches an OLD name we've since changed
+      const staleLabels = ['Aporte Empresa','Retorno de Aporte','Retorno Aporte',
+        'Pessoais - Saulo','Educação','Transporte','Roupas','Serviços'];
+      let labelChanged = false;
+      staleLabels.forEach(function(oldLabel) {
+        Object.keys(labelsObj).forEach(function(id) {
+          if (labelsObj[id] === oldLabel) { delete labelsObj[id]; labelChanged = true; }
+        });
+      });
+      if (labelChanged) localStorage.setItem('fp:catLabels', JSON.stringify(labelsObj));
+    } catch(e) {}
+  }
+
+  // Remove duplicate custom categories that duplicate built-in ones
+  // (e.g. user may have created "Cachorros" via UI before it became built-in)
+  const customStored = localStorage.getItem('fp:customCats');
+  if (customStored) {
+    try {
+      const builtInIds = ["supermercado","transporte","saude","lazer","viagem","moradia",
+        "educacao","custo_fin_focus","custo_fin_pessoal","despesas_focus","pessoais_saulo",
+        "transferencia","cachorros","cartao_dani","serena_rotina","inv_temp_cred","inv_temp_deb",
+        "inv_aporte","inv_resgate","inv_lucro","outras_entradas","aporte_empresa","retorno_aporte","receita","outros"];
+      let customs = JSON.parse(customStored);
+      // Also remove any custom cat whose label matches a built-in label (case-insensitive)
+      const builtInLabels = CATEGORIES.map(c => c.label.toLowerCase());
+      const cleaned = customs.filter(c =>
+        !builtInIds.includes(c.id) &&
+        !builtInLabels.includes((c.label||'').toLowerCase())
+      );
+      if (cleaned.length !== customs.length) {
+        localStorage.setItem('fp:customCats', JSON.stringify(cleaned));
+      }
+    } catch(e) {}
+  }
+})();
+// Load data from Supabase if configured, then initialize
+(async function init() {
+  if (_sb) {
+    document.getElementById("dashboard").innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text2)"><i class="ti ti-loader-2" style="font-size:40px;display:block;margin-bottom:12px;animation:spin 1s linear infinite"></i>Carregando dados...</div>';
+    try {
+      const remoteTx = await loadTxFromSupabase();
+      if (remoteTx && remoteTx.length > 0) transactions = remoteTx;
+      const remoteGoals    = await DB.get("fp:goals");    if (remoteGoals)    goals    = JSON.parse(remoteGoals);
+      const remoteInv      = await DB.get("fp:inv");      if (remoteInv)      invGoal  = JSON.parse(remoteInv);
+      const remoteProjects = await DB.get("fp:projects"); if (remoteProjects) projects = JSON.parse(remoteProjects);
+      const remoteSources  = await DB.get("fp:sources");  if (remoteSources)  sources  = JSON.parse(remoteSources);
+      const remoteImportLog= await DB.get("fp:importLog"); if (remoteImportLog) localStorage.setItem("fp:importLog", remoteImportLog);
+    } catch(e) { console.warn("Supabase load error:", e); }
+  }
+  loadCustomCategories();
+  buildMonthSelect();
+  renderDashboard();
+  updateUnclassifiedBadge();
+})();
+
+document.head.insertAdjacentHTML("beforeend","<style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>");
+</script>
+</body>
+</html>
