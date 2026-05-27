@@ -573,8 +573,9 @@ const CATEGORIES = [
   { id:"receita",           label:"Receita / Entrada",       icon:"ti-cash",                color:"#16A085" },
   { id:"transferencia",     label:"Transferência",           icon:"ti-arrows-exchange",     color:"#78909C" },
   { id:"outros",            label:"Outros",                  icon:"ti-dots",                color:"#95A5A6" },
+  { id:"pgto_cartao",        label:"Pagamento Cartão Crédito", icon:"ti-credit-card-pay",     color:"#546E7A" },
 ]
-const EXPENSE_CATS = ["supermercado","transporte","saude","lazer","viagem","moradia","educacao","custo_fin_focus","custo_fin_pessoal","despesas_focus","pessoais_saulo","cachorros","cartao_dani","serena_rotina","inv_temp_cred","inv_temp_deb","inv_aporte","inv_resgate","inv_lucro","outras_entradas","outros"];
+const EXPENSE_CATS = ["supermercado","transporte","saude","lazer","viagem","moradia","educacao","custo_fin_focus","custo_fin_pessoal","despesas_focus","pessoais_saulo","cachorros","cartao_dani","serena_rotina","inv_temp_cred","inv_temp_deb","inv_aporte","inv_resgate","inv_lucro","outras_entradas","pgto_cartao","outros"];
 // KEYWORD_MAP: carregado do localStorage para permitir customizações do usuário
 const DEFAULT_KEYWORD_MAP = {
   supermercado: [
@@ -1235,17 +1236,17 @@ function renderTransactions() {
         </tr>
         <tr style="background:var(--surface2)">
           <th style="padding:4px 8px;font-weight:400">
-            <input type="text" placeholder="🔍 data" value="${txFilters.date}"
-              oninput="txFilters.date=this.value;renderTransactions()"
+            <input type="text" id="flt_date" placeholder="🔍 data" value="${txFilters.date}"
+              oninput="setTxFilter('date',this.value)"
               style="width:100%;font-size:11px;padding:3px 6px;border-radius:5px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
           </th>
           <th style="padding:4px 8px;font-weight:400">
-            <input type="text" placeholder="🔍 descrição" value="${txFilters.description}"
-              oninput="txFilters.description=this.value;renderTransactions()"
+            <input type="text" id="flt_description" placeholder="🔍 descrição" value="${txFilters.description}"
+              oninput="setTxFilter('description',this.value)"
               style="width:100%;font-size:11px;padding:3px 6px;border-radius:5px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
           </th>
           <th style="padding:4px 8px;font-weight:400">
-            <select oninput="txFilters.category=this.value;renderTransactions()"
+            <select onchange="setTxFilter('category',this.value)"
               style="width:100%;font-size:11px;padding:3px 4px;border-radius:5px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
               <option value="">🔍 todas</option>
               <option value="__unclassified__">Sem categoria</option>
@@ -1253,25 +1254,27 @@ function renderTransactions() {
             </select>
           </th>
           <th style="padding:4px 8px;font-weight:400">
-            <input type="text" placeholder="🔍 obs" value="${txFilters.notes||''}"
-              oninput="txFilters.notes=this.value;renderTransactions()"
+            <input type="text" id="flt_notes" placeholder="🔍 obs" value="${txFilters.notes||''}"
+              oninput="setTxFilter('notes',this.value)"
               style="width:100%;font-size:11px;padding:3px 6px;border-radius:5px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
           </th>
           <th style="padding:4px 8px;font-weight:400">
-            <input type="text" placeholder="🔍 fonte" value="${txFilters.source}"
-              oninput="txFilters.source=this.value;renderTransactions()"
-              style="width:100%;font-size:11px;padding:3px 6px;border-radius:5px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
+            <select onchange="setTxFilter('source',this.value)"
+              style="width:100%;font-size:11px;padding:3px 4px;border-radius:5px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
+              <option value="">🔍 fonte</option>
+              ${[...new Set(transactions.map(t=>t.sourceName).filter(Boolean))].sort().map(s=>`<option value="${s}" ${txFilters.source===s?"selected":""}>${s}</option>`).join("")}
+            </select>
           </th>
           <th style="padding:4px 8px;font-weight:400;text-align:center">
-            <select oninput="txFilters.dani=this.value;renderTransactions()" style="width:100%;font-size:11px;padding:3px 4px;border-radius:5px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
+            <select onchange="setTxFilter('dani',this.value)" style="width:100%;font-size:11px;padding:3px 4px;border-radius:5px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
               <option value="">🔍 Dani</option>
               <option value="yes" ${txFilters.dani==="yes"?"selected":""}>Sim</option>
               <option value="no"  ${txFilters.dani==="no"?"selected":""}>Não</option>
             </select>
           </th>
           <th style="padding:4px 8px;font-weight:400">
-            <input type="text" placeholder="🔍 ex: >100" value="${txFilters.amount}"
-              oninput="txFilters.amount=this.value;renderTransactions()"
+            <input type="text" id="flt_amount" placeholder="🔍 ex: >100" value="${txFilters.amount}"
+              oninput="setTxFilter('amount',this.value)"
               style="width:100%;font-size:11px;padding:3px 6px;border-radius:5px;border:0.5px solid var(--border2);background:var(--surface);color:var(--text)">
           </th>
         </tr>
@@ -1409,6 +1412,29 @@ function saveEditTx(id) {
   save();
   renderActiveTab();
 }
+// Debounced filter setter — preserves focus on text inputs while filtering
+let _txFilterTimer = null;
+function setTxFilter(field, value) {
+  txFilters[field] = value;
+  // Selects (category, source, dani) render immediately — no focus to lose
+  // Text inputs use debounce so the user can keep typing
+  const isText = ["date","description","notes","amount"].includes(field);
+  if (isText) {
+    clearTimeout(_txFilterTimer);
+    _txFilterTimer = setTimeout(() => {
+      const activeId = document.activeElement?.id;
+      renderTransactions();
+      // Restore focus and cursor position after re-render
+      if (activeId) {
+        const el = document.getElementById(activeId);
+        if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+      }
+    }, 300);
+  } else {
+    renderTransactions();
+  }
+}
+
 function clearTxFilters() {
   txFilters={date:"",description:"",category:"",source:"",amount:"",notes:"",dani:""};
   renderTransactions();
