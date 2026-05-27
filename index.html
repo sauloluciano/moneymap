@@ -514,13 +514,29 @@ async function saveTxToSupabase(txs) {
     is_additional_card:  t.isAdditionalCard || false,
     raw_date:            t._rawDate || null,
   }));
-  await _sb.from('fp_transactions').upsert(rows, { onConflict: 'id' });
+  // Chunk upserts to avoid payload limits and timeouts
+  const CHUNK = 200;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    await _sb.from('fp_transactions').upsert(rows.slice(i, i + CHUNK), { onConflict: 'id' });
+  }
 }
 
 async function loadTxFromSupabase() {
-  const { data, error } = await _sb.from('fp_transactions').select('*').order('date', { ascending: false });
-  if (error || !data) return null;
-  return data.map(r => ({
+  // Supabase default page size is 1000 — paginate to get all rows
+  const PAGE = 1000;
+  let all = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await _sb.from('fp_transactions').select('*')
+      .order('date', { ascending: false })
+      .range(from, from + PAGE - 1);
+    if (error || !data) break;
+    all = all.concat(data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  if (!all.length) return null;
+  return all.map(r => ({
     id:               r.id,
     date:             r.date,
     originalDate:     r.original_date,
@@ -2839,7 +2855,7 @@ function restoreTransactions(input) {
   const file = input.files[0]; if (!file) return;
   input.value = '';
   const reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = async function(e) {
     try {
       const data = JSON.parse(e.target.result);
       if (data._type !== 'moneymap_transactions') throw new Error('Arquivo inválido. Selecione um backup de transações.');
@@ -2862,12 +2878,21 @@ function restoreTransactions(input) {
       }
 
       if (data.importLog) { localStorage.setItem('fp:importLog', JSON.stringify(data.importLog)); DB.set('fp:importLog', JSON.stringify(data.importLog)); }
-      save();
-      const n = new Date();
-      filterMonth = n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0');
+      // Show saving indicator
+      showBackupMsg('⏳ Salvando no Supabase... aguarde.', '#1a3a2a', '#EAF3DE');
+      try {
+        await saveTxToSupabase(transactions);
+        await DB.set("fp:goals",    JSON.stringify(goals));
+        await DB.set("fp:inv",      JSON.stringify(invGoal));
+        await DB.set("fp:projects", JSON.stringify(projects));
+        await DB.set("fp:sources",  JSON.stringify(sources));
+      } catch(saveErr) {
+        console.error('Restore save error:', saveErr);
+      }
       updateMonthSelect();
       updateUnclassifiedBadge();
       renderDashboard();
+      showBackupMsg('✓ Restauração concluída e salva no Supabase!', '#3B6D11', '#EAF3DE');
     } catch(err) {
       showBackupMsg('✗ Erro: ' + err.message, '#A32D2D', '#FCEBEB');
     }
