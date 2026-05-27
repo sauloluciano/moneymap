@@ -259,9 +259,70 @@
   .review-table tr:hover td { background: var(--surface2); }
   .cat-select { font-size: 12px; padding: 2px 6px; border-radius: 5px; border: 0.5px solid var(--border2); background: var(--surface); color: var(--text); cursor: pointer; max-width: 140px; }
   .import-confirm { background: #EAF3DE; border: 0.5px solid #639922; border-radius: var(--radius); padding: 16px 18px; margin-top: 16px; }
+
+  /* ─── Login Screen ─────────────────────────────────────────── */
+  #loginScreen { position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999; }
+  #loginScreen.hidden { display:none; }
+  .login-box { background:var(--surface);border-radius:16px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,0.12);border:0.5px solid var(--border); }
+  .login-logo { display:flex;align-items:center;gap:10px;margin-bottom:28px; }
+  .login-logo-icon { width:38px;height:38px;border-radius:10px;background:#1a3a2a;display:flex;align-items:center;justify-content:center; }
+  .login-title { font-size:18px;font-weight:600;letter-spacing:-0.4px; }
+  .login-field { margin-bottom:14px; }
+  .login-field label { display:block;font-size:12px;color:var(--text2);margin-bottom:5px;font-weight:500; }
+  .login-field input { width:100%;padding:10px 12px;border-radius:8px;border:0.5px solid var(--border2);background:var(--bg);color:var(--text);font-size:14px;font-family:inherit; }
+  .login-field input:focus { outline:none;border-color:#27AE60; }
+  .login-btn { width:100%;padding:11px;border-radius:8px;border:none;background:#1a3a2a;color:#fff;font-size:14px;font-weight:500;cursor:pointer;margin-top:6px;font-family:inherit; }
+  .login-btn:hover { background:#22503a; }
+  .login-err { color:#E24B4A;font-size:12px;margin-top:8px;text-align:center;min-height:18px; }
+  .login-toggle { font-size:12px;color:var(--text2);text-align:center;margin-top:16px;cursor:pointer;text-decoration:underline; }
+  .login-toggle:hover { color:var(--text); }
+  .user-chip { display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);padding:4px 10px;border-radius:20px;border:0.5px solid var(--border);cursor:pointer;background:transparent;font-family:inherit; }
+  .user-chip:hover { background:var(--surface2); }
 </style>
 </head>
 <body>
+
+<!-- ─── Login Screen ─────────────────────────────────────────────────────── -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="login-logo-icon"><i class="ti ti-leaf" style="color:#4ade80;font-size:18px"></i></div>
+      <span class="login-title">MoneyMap</span>
+    </div>
+    <div id="loginForm">
+      <div class="login-field">
+        <label>Usuário</label>
+        <input type="text" id="loginUser" placeholder="seu usuário" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <div class="login-field">
+        <label>Senha</label>
+        <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button class="login-btn" onclick="doLogin()">Entrar</button>
+      <div class="login-err" id="loginErr"></div>
+      <div class="login-toggle" onclick="showChangePass()">Alterar senha</div>
+    </div>
+    <div id="changePassForm" style="display:none">
+      <div style="font-size:14px;font-weight:500;margin-bottom:16px">Alterar senha</div>
+      <div class="login-field">
+        <label>Usuário</label>
+        <input type="text" id="cpUser" placeholder="seu usuário" autocomplete="username">
+      </div>
+      <div class="login-field">
+        <label>Senha atual</label>
+        <input type="password" id="cpOld" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div class="login-field">
+        <label>Nova senha</label>
+        <input type="password" id="cpNew" placeholder="mínimo 4 caracteres" autocomplete="new-password" onkeydown="if(event.key==='Enter')doChangePass()">
+      </div>
+      <button class="login-btn" onclick="doChangePass()">Salvar nova senha</button>
+      <div class="login-err" id="cpErr"></div>
+      <div class="login-toggle" onclick="showLoginForm()">← Voltar ao login</div>
+    </div>
+  </div>
+</div>
+
 <div id="app">
   <div class="header">
     <div class="header-top">
@@ -270,7 +331,14 @@
         <span class="logo-name">MoneyMap</span>
         <span class="badge-saved">salvo</span>
       </div>
-      <select class="month-select" id="monthSelect"></select>
+      <div style="display:flex;align-items:center;gap:10px">
+        <select class="month-select" id="monthSelect"></select>
+        <button class="user-chip" onclick="doLogout()" title="Clique para sair">
+          <i class="ti ti-user" style="font-size:13px"></i>
+          <span id="userChipName">—</span>
+          <i class="ti ti-logout" style="font-size:12px;opacity:0.6"></i>
+        </button>
+      </div>
     </div>
     <div class="nav">
       <button class="nav-btn active" data-tab="dashboard"><i class="ti ti-layout-dashboard"></i>Dashboard</button>
@@ -295,6 +363,120 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
+// ─── Auth ────────────────────────────────────────────────────────────────────
+// Senhas armazenadas na tabela fp_config do Supabase com a chave "fp:users"
+// Formato: { saulo: "hash", dani: "hash" }
+// Hash simples: btoa(usuario+":"+senha) — suficiente para uso pessoal
+const DEFAULT_USERS = { saulo: btoa("saulo:123mudar"), dani: btoa("dani:123mudar") };
+let currentUser = null; // nome do usuário logado
+
+function authHash(user, pass) { return btoa(user + ":" + pass); }
+
+async function loadUsers() {
+  try {
+    const r = await DB.get("fp:users");
+    return r ? JSON.parse(r) : DEFAULT_USERS;
+  } catch(e) { return DEFAULT_USERS; }
+}
+
+async function doLogin() {
+  const user = (document.getElementById("loginUser")?.value || "").trim().toLowerCase();
+  const pass = document.getElementById("loginPass")?.value || "";
+  const err  = document.getElementById("loginErr");
+  if (!user || !pass) { err.textContent = "Preencha usuário e senha."; return; }
+  const users = await loadUsers();
+  if (users[user] && users[user] === authHash(user, pass)) {
+    currentUser = user;
+    localStorage.setItem("fp:session", JSON.stringify({ user, hash: users[user] }));
+    document.getElementById("loginScreen").classList.add("hidden");
+    document.getElementById("userChipName").textContent = user.charAt(0).toUpperCase() + user.slice(1);
+    err.textContent = "";
+  } else {
+    err.textContent = "Usuário ou senha incorretos.";
+  }
+}
+
+async function doChangePass() {
+  const user   = (document.getElementById("cpUser")?.value || "").trim().toLowerCase();
+  const oldP   = document.getElementById("cpOld")?.value || "";
+  const newP   = document.getElementById("cpNew")?.value || "";
+  const err    = document.getElementById("cpErr");
+  if (!user || !oldP || !newP) { err.textContent = "Preencha todos os campos."; return; }
+  if (newP.length < 4) { err.textContent = "Nova senha deve ter pelo menos 4 caracteres."; return; }
+  const users = await loadUsers();
+  if (!users[user] || users[user] !== authHash(user, oldP)) { err.textContent = "Usuário ou senha atual incorretos."; return; }
+  users[user] = authHash(user, newP);
+  await DB.set("fp:users", JSON.stringify(users));
+  err.style.color = "#27AE60";
+  err.textContent = "Senha alterada com sucesso!";
+  setTimeout(() => { showLoginForm(); err.style.color = "#E24B4A"; }, 1500);
+}
+
+function doLogout() {
+  if (!confirm("Deseja sair?")) return;
+  currentUser = null;
+  localStorage.removeItem("fp:session");
+  document.getElementById("loginScreen").classList.remove("hidden");
+  document.getElementById("loginUser").value = "";
+  document.getElementById("loginPass").value = "";
+  document.getElementById("loginErr").textContent = "";
+  showLoginForm();
+}
+
+function showChangePass() {
+  document.getElementById("loginForm").style.display = "none";
+  document.getElementById("changePassForm").style.display = "block";
+}
+function showLoginForm() {
+  document.getElementById("changePassForm").style.display = "none";
+  document.getElementById("loginForm").style.display = "block";
+}
+
+async function checkSession() {
+  try {
+    const sess = JSON.parse(localStorage.getItem("fp:session") || "null");
+    if (!sess) return false;
+    const users = await loadUsers();
+    if (users[sess.user] && users[sess.user] === sess.hash) {
+      currentUser = sess.user;
+      document.getElementById("userChipName").textContent = sess.user.charAt(0).toUpperCase() + sess.user.slice(1);
+      document.getElementById("loginScreen").classList.add("hidden");
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+// ─── Daily Backup ─────────────────────────────────────────────────────────────
+async function runDailyBackup() {
+  try {
+    const today = new Date().toISOString().slice(0, 10); // "2026-05-26"
+    const lastBackup = localStorage.getItem("fp:lastBackup");
+    if (lastBackup === today) return; // já fez hoje
+    const importLog = JSON.parse(localStorage.getItem("fp:importLog") || "[]");
+    const payload = {
+      _version: 2,
+      _type: "moneymap_backup",
+      _exportedAt: new Date().toISOString(),
+      transactions,
+      importLog,
+      goals,
+      invGoal,
+      projects,
+      sources,
+    };
+    await _sb.from("fp_backups").insert({
+      backup_date: today,
+      data: payload,
+      created_at: new Date().toISOString(),
+    });
+    localStorage.setItem("fp:lastBackup", today);
+    console.log("Backup diário salvo:", today);
+  } catch(e) {
+    console.warn("Backup diário falhou:", e);
+  }
+}
+
 // ─── Supabase config — SUBSTITUA pelos valores do seu projeto ───────────────
 const SUPABASE_URL = 'https://fzezjjioieqfszuvwzfm.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6ZXpqamlvaWVxZnN6dXZ3emZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NjQ2OTEsImV4cCI6MjA5NTM0MDY5MX0.MZnWwKg2XbtxuFhtlHQqq2ybfTMK0Ngj7wN0uLoN9iQ';
@@ -1033,7 +1215,10 @@ function renderTransactions() {
 
   html+=`<div class="row-between mb-12">
     <span style="font-size:13px;color:var(--text2)">${anyFilter ? sorted.length+" de "+txs.length+" transações" : sorted.length+" transações"}</span>
-    <button class="btn" onclick="exportCSV()"><i class="ti ti-download" style="font-size:13px"></i> Exportar CSV</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn" onclick="openNewTxModal()" style="background:#1a3a2a;color:#fff;border-color:#1a3a2a"><i class="ti ti-plus" style="font-size:13px"></i> Nova transação</button>
+      <button class="btn" onclick="exportCSV()"><i class="ti ti-download" style="font-size:13px"></i> Exportar CSV</button>
+    </div>
   </div>
   <div class="data-table">
     <table style="table-layout:fixed">
@@ -3100,6 +3285,9 @@ function migrateCats() {
 
 // Load data from Supabase, then initialize
 (async function init() {
+  // Check existing session first
+  const hasSession = await checkSession();
+  // Load all data
   document.getElementById("dashboard").innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text2)"><i class="ti ti-loader-2" style="font-size:40px;display:block;margin-bottom:12px;animation:spin 1s linear infinite"></i>Carregando dados...</div>';
   try {
     const remoteTx = await loadTxFromSupabase();
@@ -3115,9 +3303,123 @@ function migrateCats() {
   buildMonthSelect();
   renderDashboard();
   updateUnclassifiedBadge();
+  // Daily backup (only if logged in)
+  if (hasSession) runDailyBackup();
 })();
 
 document.head.insertAdjacentHTML("beforeend","<style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>");
+
+// ─── Nova Transação Manual ────────────────────────────────────────────────────
+function openNewTxModal() {
+  const today = new Date().toISOString().slice(0,10);
+  const catOpts = catOptionsHTML("outros", false);
+  const projOpts = projects.filter(p=>!p.archived).map(p=>'<option value="'+p.id+'">'+p.name+'</option>').join("");
+  const modal = document.createElement("div");
+  modal.id = "newTxModal";
+  modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:8888";
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:14px;padding:28px;width:100%;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,0.18);border:0.5px solid var(--border)">
+      <div style="font-size:15px;font-weight:600;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center">
+        <span><i class="ti ti-plus" style="margin-right:6px"></i>Nova Transação</span>
+        <button onclick="closeNewTxModal()" style="background:transparent;border:none;cursor:pointer;font-size:18px;color:var(--text2)">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Data</div>
+          <input type="date" id="ntx_date" value="${today}" style="width:100%;font-size:13px;padding:7px 10px;border-radius:7px;border:0.5px solid var(--border2);background:var(--bg);color:var(--text)">
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Tipo</div>
+          <select id="ntx_sign" style="width:100%;font-size:13px;padding:7px 8px;border-radius:7px;border:0.5px solid var(--border2);background:var(--bg);color:var(--text)">
+            <option value="neg">− Débito</option>
+            <option value="pos">+ Crédito</option>
+          </select>
+        </div>
+        <div style="grid-column:span 2">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Descrição *</div>
+          <input type="text" id="ntx_desc" placeholder="Descrição da transação" style="width:100%;font-size:13px;padding:7px 10px;border-radius:7px;border:0.5px solid var(--border2);background:var(--bg);color:var(--text)">
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Valor *</div>
+          <input type="number" id="ntx_amount" step="0.01" min="0" placeholder="0,00" style="width:100%;font-size:13px;padding:7px 10px;border-radius:7px;border:0.5px solid var(--border2);background:var(--bg);color:var(--text)">
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Categoria</div>
+          <select id="ntx_cat" class="cat-select" style="width:100%;font-size:13px;padding:7px 8px"><option value="">— não classif. —</option>${catOpts}</select>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Observação</div>
+          <input type="text" id="ntx_notes" maxlength="50" placeholder="Opcional" style="width:100%;font-size:13px;padding:7px 10px;border-radius:7px;border:0.5px solid var(--border2);background:var(--bg);color:var(--text)">
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Projeto</div>
+          <select id="ntx_proj" class="cat-select" style="width:100%;font-size:13px;padding:7px 8px"><option value="">Sem projeto</option>${projOpts}</select>
+        </div>
+        <div style="grid-column:span 2">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Fonte</div>
+          <input type="text" value="Manual - ${currentUser ? currentUser.charAt(0).toUpperCase()+currentUser.slice(1) : 'Usuário'}" disabled style="width:100%;font-size:13px;padding:7px 10px;border-radius:7px;border:0.5px solid var(--border2);background:var(--surface2);color:var(--text2)">
+        </div>
+        <div style="grid-column:span 2">
+          <label style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" id="ntx_dani"> Cartão Dani
+          </label>
+        </div>
+      </div>
+      <div id="ntx_err" style="color:#E24B4A;font-size:12px;margin-top:8px;min-height:16px"></div>
+      <div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end">
+        <button onclick="closeNewTxModal()" style="font-size:13px;padding:8px 18px;border-radius:7px;border:0.5px solid var(--border);background:transparent;cursor:pointer;color:var(--text2)">Cancelar</button>
+        <button onclick="saveNewTx()" style="font-size:13px;padding:8px 20px;border-radius:7px;border:none;background:#1a3a2a;color:#fff;cursor:pointer;font-weight:500">Salvar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener("click", e => { if (e.target === modal) closeNewTxModal(); });
+  setTimeout(() => document.getElementById("ntx_desc")?.focus(), 50);
+}
+
+function closeNewTxModal() {
+  const m = document.getElementById("newTxModal");
+  if (m) m.remove();
+}
+
+function saveNewTx() {
+  const date   = document.getElementById("ntx_date")?.value;
+  const desc   = (document.getElementById("ntx_desc")?.value || "").trim();
+  const amtRaw = parseFloat(document.getElementById("ntx_amount")?.value);
+  const sign   = document.getElementById("ntx_sign")?.value;
+  const cat    = document.getElementById("ntx_cat")?.value;
+  const notes  = (document.getElementById("ntx_notes")?.value || "").trim();
+  const proj   = document.getElementById("ntx_proj")?.value;
+  const dani   = document.getElementById("ntx_dani")?.checked;
+  const err    = document.getElementById("ntx_err");
+
+  if (!date) { err.textContent = "Informe a data."; return; }
+  if (!desc) { err.textContent = "Informe a descrição."; return; }
+  if (isNaN(amtRaw) || amtRaw <= 0) { err.textContent = "Informe um valor maior que zero."; return; }
+
+  const userName = currentUser ? currentUser.charAt(0).toUpperCase() + currentUser.slice(1) : "Usuário";
+  const amount = sign === "pos" ? amtRaw : -amtRaw;
+  const tx = {
+    id:               Math.random().toString(36).slice(2) + Date.now().toString(36),
+    date,
+    originalDate:     null,
+    description:      desc.toUpperCase(),
+    amount,
+    type:             amount >= 0 ? "income" : "expense",
+    category:         cat || null,
+    notes:            notes || "",
+    sourceId:         null,
+    sourceName:       "Manual - " + userName,
+    projectId:        proj || undefined,
+    importId:         null,
+    isAdditionalCard: dani || false,
+    _rawDate:         null,
+  };
+  transactions.push(tx);
+  save();
+  closeNewTxModal();
+  renderActiveTab();
+  updateUnclassifiedBadge();
+}
 </script>
 </body>
 </html>
