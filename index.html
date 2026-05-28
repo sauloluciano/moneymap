@@ -2244,7 +2244,7 @@ async function extractWithAI(source, filename, apiKey) {
   if (source.type === "text") {
     body = {
       model: "claude-sonnet-4-6",
-      max_tokens: 4000,
+      max_tokens: 8000,
       messages: [{ role: "user", content: prompt + "\n\nConteudo do arquivo:\n\n" + source.content.slice(0, 50000) }]
     };
   } else {
@@ -2256,7 +2256,7 @@ async function extractWithAI(source, filename, apiKey) {
     }
     body = {
       model: "claude-sonnet-4-6",
-      max_tokens: 4000,
+      max_tokens: 8000,
       messages: [{ role: "user", content: contentParts }]
     };
   }
@@ -2288,7 +2288,7 @@ async function extractWithAI(source, filename, apiKey) {
     // Try to find JSON array inside the response
     const match = clean.match(/\[[\s\S]*\]/);
     if (match) parsed = JSON.parse(match[0]);
-    else throw new Error("A IA não retornou JSON válido. Tente novamente.");
+    else throw new Error("A IA não retornou JSON válido. Resposta recebida: " + clean.slice(0, 200));
   }
 
   if (!Array.isArray(parsed)) throw new Error("Formato inesperado retornado pela IA.");
