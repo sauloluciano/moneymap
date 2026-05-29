@@ -2216,7 +2216,10 @@ async function extractWithAI(source, filename, apiKey) {
     ? 'Este eh cartao de credito vencimento dia ' + _src.dueDay + '. Para cada compra use como date o dia ' + String(_src.dueDay).padStart(2,'0') + ' do mes seguinte (compra 15/03 -> date 2026-04-' + String(_src.dueDay).padStart(2,'0') + '). Salve data original da compra em originalDate.'
     : 'Use a data exata de cada lancamento conforme aparece no extrato.';
 
+  // For large PDFs, ask only for transactions to minimize response size
+  // and add explicit instruction to never truncate
   const prompt = "Voce e um extrator de dados financeiros. Analise este documento e extraia TODAS as transacoes individuais.\n\n"
+    + "CRITICO: retorne TODOS os lancamentos sem excecao. Nao pare antes de terminar. Nao resuma nem agrupe.\n\n"
     + "Retorne APENAS um array JSON valido, sem texto adicional, sem markdown, sem blocos de codigo.\n\n"
     + "Cada item deve ter:\n"
     + "- date: string YYYY-MM-DD\n"
@@ -2285,10 +2288,27 @@ async function extractWithAI(source, filename, apiKey) {
   let parsed;
   try { parsed = JSON.parse(clean); }
   catch(e) {
-    // Try to find JSON array inside the response
+    // Try to find complete JSON array inside the response
     const match = clean.match(/\[[\s\S]*\]/);
-    if (match) parsed = JSON.parse(match[0]);
-    else throw new Error("A IA não retornou JSON válido. Resposta recebida: " + clean.slice(0, 200));
+    if (match) {
+      try { parsed = JSON.parse(match[0]); }
+      catch(e2) { parsed = null; }
+    }
+    // If still failed (truncated response), recover all complete objects
+    if (!parsed) {
+      const objMatches = [...clean.matchAll(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g)];
+      if (objMatches.length > 0) {
+        const recovered = [];
+        for (const m of objMatches) {
+          try { recovered.push(JSON.parse(m[0])); } catch(e3) {}
+        }
+        if (recovered.length > 0) {
+          parsed = recovered;
+          console.warn("JSON truncado — recuperadas " + recovered.length + " transações de resposta parcial.");
+        }
+      }
+    }
+    if (!parsed) throw new Error("A IA não retornou JSON válido. Resposta recebida: " + clean.slice(0, 200));
   }
 
   if (!Array.isArray(parsed)) throw new Error("Formato inesperado retornado pela IA.");
