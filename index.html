@@ -2541,12 +2541,14 @@ function confirmImport() {
 
   transactions = [...transactions, ...toAdd];
 
-  // Save import log
+  // Save import log — localStorage + Supabase
   const months = [...new Set(toAdd.map(t => t.date.slice(0,7)))].sort();
   const importLog = JSON.parse(localStorage.getItem("fp:importLog") || "[]");
   const importFileName = pendingImportFileName || '';
   importLog.unshift({ id: importId, at: importedAt, count: toAdd.length, months, fileName: importFileName, sourceName: selectedSource?.name || '' });
-  localStorage.setItem("fp:importLog", JSON.stringify(importLog.slice(0, 50)));
+  const trimmedLog = importLog.slice(0, 50);
+  localStorage.setItem("fp:importLog", JSON.stringify(trimmedLog));
+  DB.set('fp:importLog', JSON.stringify(trimmedLog)).catch(e => console.error('importLog save error:', e));
 
   save();
   pendingImport = [];
@@ -2897,7 +2899,26 @@ function restoreTransactions(input) {
         showBackupMsg('✓ ' + transactions.length + ' transações restauradas (dados anteriores substituídos)', '#3B6D11', '#EAF3DE');
       }
 
-      if (data.importLog) { localStorage.setItem('fp:importLog', JSON.stringify(data.importLog)); DB.set('fp:importLog', JSON.stringify(data.importLog)); }
+      // Rebuild importLog from transactions if not present in file
+      let restoredLog = data.importLog ? [...data.importLog] : [];
+      if (!data.importLog || data.importLog.length === 0) {
+        // Group transactions by importId and generate log entries
+        const byImport = {};
+        (action ? (data.transactions.filter(t => !new Set(transactions.map(x=>x.id)).has(t.id))) : data.transactions).forEach(t => {
+          const iid = t.importId || 'restore_' + Date.now().toString(36);
+          if (!byImport[iid]) byImport[iid] = { id: iid, at: new Date().toLocaleString('pt-BR'), count: 0, months: new Set(), fileName: data._exportedAt || 'restauração', sourceName: t.sourceName || '' };
+          byImport[iid].count++;
+          if (t.date) byImport[iid].months.add(t.date.slice(0,7));
+        });
+        restoredLog = Object.values(byImport).map(e => ({ ...e, months: [...e.months].sort() }));
+      }
+      // Merge with existing log
+      const existingLog = JSON.parse(localStorage.getItem('fp:importLog') || '[]');
+      const existingLogIds = new Set(existingLog.map(e => e.id));
+      const newLogEntries = restoredLog.filter(e => !existingLogIds.has(e.id));
+      const mergedLog = [...newLogEntries, ...existingLog].slice(0, 50);
+      localStorage.setItem('fp:importLog', JSON.stringify(mergedLog));
+      DB.set('fp:importLog', JSON.stringify(mergedLog)).catch(e => console.error('importLog restore error:', e));
       // Show saving indicator
       showBackupMsg('⏳ Salvando no Supabase... aguarde.', '#1a3a2a', '#EAF3DE');
       try {
@@ -3026,11 +3047,15 @@ function invertImport(importId) {
   showBackupMsg("✓ Sinais invertidos em " + count + " transações.", "#3B6D11", "#EAF3DE");
 }
 
-function undoImport(importId) {
+async function undoImport(importId) {
   const imp = JSON.parse(localStorage.getItem("fp:importLog") || "[]").find(i => i.id === importId);
   const count = transactions.filter(t => t.importId === importId).length;
   if (!confirm("Remover " + count + " transações desta importação?")) return;
   transactions = transactions.filter(t => t.importId !== importId);
+  const updatedLog = JSON.parse(localStorage.getItem("fp:importLog") || "[]").filter(i => i.id !== importId);
+  localStorage.setItem("fp:importLog", JSON.stringify(updatedLog));
+  DB.set('fp:importLog', JSON.stringify(updatedLog)).catch(e => console.error('undoImport log error:', e));
+  await deleteTxByImportId(importId);
   save();
   updateMonthSelect();
   updateUnclassifiedBadge();
@@ -3044,6 +3069,7 @@ function clearAllImports() {
   if (!confirm("Remover TODAS as " + total + " transações? Esta ação não pode ser desfeita.")) return;
   transactions = [];
   localStorage.removeItem("fp:importLog");
+  DB.set('fp:importLog', JSON.stringify([])).catch(e => console.error('clearAllImports log error:', e));
   save();
   const n = new Date();
   filterMonth = n.getFullYear() + "-" + String(n.getMonth()+1).padStart(2,"0");
